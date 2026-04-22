@@ -23,7 +23,7 @@ ladder_action(P, Q, M, zero) :-
     nonnegative_integer(Q),
     nonnegative_integer(M),
     Q > M.
-ladder_action(P, Q, M, nonzero(Target, coeff(M, Target, Den))) :-
+ladder_action(P, Q, M, nonzero(target(Target), coeff(source(M), target(Target), denominator(Den)))) :-
     nonnegative_integer(P),
     nonnegative_integer(Q),
     nonnegative_integer(M),
@@ -42,7 +42,7 @@ me_ladder(N, P, Q, M, zero) :-
     Q =< M,
     Target is M - Q + P,
     N =\= Target.
-me_ladder(N, P, Q, M, nonzero(Target, coeff(M, Target, Den))) :-
+me_ladder(N, P, Q, M, nonzero(target(Target), coeff(source(M), target(Target), denominator(Den)))) :-
     valid_ladder_args(N, P, Q, M),
     Q =< M,
     Den is M - Q,

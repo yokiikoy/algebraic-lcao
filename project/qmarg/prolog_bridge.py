@@ -16,6 +16,10 @@ class PrologUnavailable(RuntimeError):
     pass
 
 
+class PrologQueryError(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class LadderCoefficient:
     source: int
@@ -43,7 +47,9 @@ class LadderMatrixElement:
         return self.coefficient.evaluate()
 
 
-_NONZERO_RE = re.compile(r"^nonzero\((\d+),coeff\((\d+),(\d+),(\d+)\)\)$")
+_NONZERO_RE = re.compile(
+    r"^nonzero\(target\((\d+)\),coeff\(source\((\d+)\),target\((\d+)\),denominator\((\d+)\)\)\)$"
+)
 
 
 def swipl_executable() -> str:
@@ -84,10 +90,17 @@ def query_ladder_matrix_element(
     prolog_file: Path = DEFAULT_PROLOG_FILE,
 ) -> LadderMatrixElement:
     goal = f"emit_me_ladder({n},{p},{q},{m}),halt."
-    completed = subprocess.run(
-        [swipl_executable(), "-q", "-s", str(prolog_file), "-g", goal],
-        check=True,
-        text=True,
-        capture_output=True,
-    )
+    try:
+        completed = subprocess.run(
+            [swipl_executable(), "-q", "-s", str(prolog_file), "-g", goal],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise PrologQueryError(
+            "SWI-Prolog query failed: "
+            f"goal={goal!r}, returncode={exc.returncode}, "
+            f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
+        ) from exc
     return parse_ladder_result(completed.stdout)
