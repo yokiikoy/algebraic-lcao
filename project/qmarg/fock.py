@@ -152,9 +152,13 @@ def origin_gaussian_matrix_element(
 ) -> float:
     """Return <n|exp(-alpha x^2)|m> in the oscillator basis.
 
-    This names the centered Gaussian multiplication operator as its own target.
+    This is the public centered target API for the future SU(1,1)-based
+    derivation path. It names the non-unitary Gaussian multiplication operator
+    without implying a unitary squeeze implementation.
+
     The implementation currently delegates to the Hermite-moment backend; a
-    future SU(1,1) normal-form backend should match this function.
+    future SU(1,1) normal-form backend must match this function before any
+    replacement of the current backend.
     """
     return ho_gaussian_matrix_element(
         n,

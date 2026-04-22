@@ -181,6 +181,17 @@ class FockKernelTest(unittest.TestCase):
                     if (n + m) % 2 == 1:
                         self.assertAlmostEqual(value, 0.0, places=14)
 
+    def test_origin_gaussian_matrix_element_identity_at_zero_alpha(self) -> None:
+        for omega in (0.8, 1.2):
+            for n in range(6):
+                for m in range(6):
+                    expected = 1.0 if n == m else 0.0
+                    self.assertAlmostEqual(
+                        origin_gaussian_matrix_element(n, m, omega, 0.0),
+                        expected,
+                        places=14,
+                    )
+
     def test_origin_gaussian_matrix_element_is_symmetric(self) -> None:
         for omega, alpha in ((0.8, 0.35), (1.2, 0.9)):
             for n in range(6):
