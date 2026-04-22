@@ -14,7 +14,7 @@ H = p^2 / 2 + sum_k w_k exp(-alpha_k (x - R_k)^2),
 compute displaced-oscillator matrix elements
 
 ```text
-<n,A|H|m,B>
+bra(n,A) H ket(m,B)
 ```
 
 without numerical quadrature.
@@ -36,14 +36,15 @@ p = i sqrt(omega / 2) (adag - a)
 Displaced states are
 
 ```text
-|n,c> = T(c)|n>,        <x|n,c> = psi_n^omega(x - c).
+ket(n,c) = T(c) ket(n)
+coordinate wavefunction: psi_n^omega(x - c)
 ```
 
 The real displacement parameter between centers is
 
 ```text
 beta(A,B) = sqrt(omega / 2) * (B - A)
-<n,A|m,B> = <n|D(beta(A,B))|m>.
+bra(n,A) ket(m,B) = bra(n) D(beta(A,B)) ket(m)
 ```
 
 The kinetic operator is
@@ -56,10 +57,10 @@ T = p^2 / 2
 Therefore
 
 ```text
-T|m> = omega/4 * (
-    (2m + 1)|m>
-    - sqrt(m(m-1)) |m-2>
-    - sqrt((m+1)(m+2)) |m+2>
+T ket(m) = omega/4 * (
+    (2m + 1) ket(m)
+    - sqrt(m(m-1)) ket(m-2)
+    - sqrt((m+1)(m+2)) ket(m+2)
 ).
 ```
 
@@ -103,7 +104,7 @@ instead of `squeeze_matrix_element` for this project.
 The first SU(1,1) target is only
 
 ```text
-<n|G_alpha|m>.
+bra(n) G_alpha ket(m)
 ```
 
 Expected structural properties:
@@ -127,7 +128,7 @@ backend is implemented.
 For centers `A`, `B`, and Gaussian center `C`,
 
 ```text
-<n,A|exp(-alpha (x-C)^2)|m,B>
+bra(n,A) exp(-alpha (x-C)^2) ket(m,B)
 ```
 
 can be reduced to centered Gaussian operators plus real displacements. This
