@@ -123,6 +123,15 @@ origin_gaussian_matrix_element(n, m, omega, alpha)
 and delegates to the Hermite-moment backend until the SU(1,1) normal-form
 backend is implemented.
 
+The independent centered comparison backend is
+
+```text
+origin_gaussian_matrix_element_su11(n, m, omega, alpha)
+```
+
+It currently covers only `bra(n) G_alpha ket(m)` and is used for dual-backend
+validation against the Hermite-moment target API.
+
 ## General Displaced Target
 
 For centers `A`, `B`, and Gaussian center `C`,
