@@ -33,3 +33,8 @@ The planned Prolog integration is documented in
 [`docs/prolog_plan.md`](docs/prolog_plan.md). Prolog is intended as a symbolic
 formula generator and rule checker; Python remains responsible for numerical
 evaluation, matrix assembly, eigensolvers, and convergence experiments.
+
+The SU(1,1) Gaussian-operator roadmap is documented in
+[`docs/su11_gaussian_operator.md`](docs/su11_gaussian_operator.md). It fixes the
+non-unitary Gaussian multiplication operator convention before adding a second
+algebraic backend.

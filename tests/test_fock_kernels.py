@@ -12,6 +12,7 @@ from qmarg.fock import (
     hermite_shifted_coefficients,
     ho_gaussian_matrix_element,
     kinetic_matrix_element,
+    origin_gaussian_matrix_element,
     shifted_gaussian_moment,
 )
 from qmarg.quadrature import GaussHermiteQuadrature
@@ -175,13 +176,24 @@ class FockKernelTest(unittest.TestCase):
     def test_centered_ho_gaussian_matrix_element_parity(self) -> None:
         omega = 0.8
         alpha = 0.35
-        center = 0.0
 
         for n in range(5):
             for m in range(5):
-                value = ho_gaussian_matrix_element(n, center, m, center, omega, alpha, center)
+                value = origin_gaussian_matrix_element(n, m, omega, alpha)
                 if (n + m) % 2 == 1:
                     self.assertAlmostEqual(value, 0.0, places=14)
+
+    def test_origin_gaussian_matrix_element_matches_general_centered_api(self) -> None:
+        omega = 0.8
+        alpha = 0.35
+
+        for n in range(5):
+            for m in range(5):
+                self.assertAlmostEqual(
+                    origin_gaussian_matrix_element(n, m, omega, alpha),
+                    ho_gaussian_matrix_element(n, 0.0, m, 0.0, omega, alpha, 0.0),
+                    places=14,
+                )
 
 
 if __name__ == "__main__":
