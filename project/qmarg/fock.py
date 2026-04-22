@@ -144,6 +144,29 @@ def ho_gaussian_matrix_element(
     return ho_norm(n, omega) * ho_norm(m, omega) * exponential_prefactor * moment_sum
 
 
+def origin_gaussian_matrix_element(
+    n: int,
+    m: int,
+    omega: float,
+    gaussian_exponent: float,
+) -> float:
+    """Return <n|exp(-alpha x^2)|m> in the oscillator basis.
+
+    This names the centered Gaussian multiplication operator as its own target.
+    The implementation currently delegates to the Hermite-moment backend; a
+    future SU(1,1) normal-form backend should match this function.
+    """
+    return ho_gaussian_matrix_element(
+        n,
+        0.0,
+        m,
+        0.0,
+        omega,
+        gaussian_exponent,
+        0.0,
+    )
+
+
 def kinetic_matrix_element(
     n: int,
     center_left: float,
