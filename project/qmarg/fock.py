@@ -76,9 +76,13 @@ def hermite_shifted_coefficients(n: int, center: float, omega: float) -> np.ndar
 def shifted_gaussian_moment(power: int, exponent: float, center: float) -> float:
     """Return integral x^power exp(-exponent * (x - center)^2) dx on R.
 
-    Expanding x^p = (u + center)^p leaves only even central moments. For
-    j=2r, integral u^(2r) exp(-a u^2) du = Gamma(r+1/2)/a^(r+1/2), so the
-    sqrt(pi) factor is included as Gamma(1/2) in the r=0 case.
+    Shift `u = x - center`, then expand `x^p = (u + center)^p`.
+    Odd powers of `u` integrate to zero over the real line. For the remaining
+    even powers `j = 2r`,
+
+        integral u^(2r) exp(-a u^2) du = Gamma(r+1/2) / a^(r+1/2).
+
+    The usual sqrt(pi) factor is therefore included as Gamma(1/2) when r=0.
     """
     if exponent <= 0.0:
         raise ValueError("Gaussian exponent must be positive.")
