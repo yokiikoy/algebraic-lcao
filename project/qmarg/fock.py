@@ -106,7 +106,13 @@ def ho_gaussian_matrix_element(
     gaussian_exponent: float,
     gaussian_center: float,
 ) -> float:
-    """Return <n,A|exp(-alpha (x-C)^2)|m,B> by finite algebraic sums."""
+    """Return <n,A|exp(-alpha (x-C)^2)|m,B> by finite algebraic sums.
+
+    The Hermite parts from the left and right oscillator states are expanded as
+    polynomials in `x`, multiplied together, and combined with the three
+    Gaussian exponentials into one shifted Gaussian. The final value is a
+    finite sum of polynomial coefficients times shifted Gaussian moments.
+    """
     if n < 0 or m < 0:
         return 0.0
     if omega <= 0.0:

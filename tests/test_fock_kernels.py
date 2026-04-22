@@ -9,6 +9,7 @@ from qmarg.fock import (
     displaced_ho_overlap,
     ho_gaussian_matrix_element,
     kinetic_matrix_element,
+    shifted_gaussian_moment,
 )
 from qmarg.quadrature import GaussHermiteQuadrature
 
@@ -21,6 +22,27 @@ def integrate_on_real_line(values: np.ndarray, order: int = 220) -> float:
 
 
 class FockKernelTest(unittest.TestCase):
+    def test_shifted_gaussian_moment_low_orders(self) -> None:
+        exponent = 0.7
+        center = -0.4
+        sqrt_pi_over_a = np.sqrt(np.pi / exponent)
+
+        self.assertAlmostEqual(
+            shifted_gaussian_moment(0, exponent, center),
+            sqrt_pi_over_a,
+            places=14,
+        )
+        self.assertAlmostEqual(
+            shifted_gaussian_moment(1, exponent, center),
+            center * sqrt_pi_over_a,
+            places=14,
+        )
+        self.assertAlmostEqual(
+            shifted_gaussian_moment(2, exponent, center),
+            (center**2 + 1.0 / (2.0 * exponent)) * sqrt_pi_over_a,
+            places=14,
+        )
+
     def test_displaced_overlap_matches_real_space_integral(self) -> None:
         omega = 0.8
         basis = DisplacedHoBasis(center_distance=1.5, functions_per_center=3, omega=omega)

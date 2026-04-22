@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 
-from qmarg.basis import DisplacedHoBasis
 from qmarg.fock import (
     displaced_ho_overlap,
     ho_gaussian_matrix_element,
@@ -13,14 +13,29 @@ from qmarg.fock import (
 from qmarg.problems import GaussianExpansionProblem
 
 
+class DisplacedHoBasisLike(Protocol):
+    omega: float
+
+    def size(self) -> int:
+        ...
+
+    def states(self) -> list[tuple[int, float]]:
+        ...
+
+
 @dataclass(frozen=True)
 class AlgebraicGaussianExpansionAssembler:
-    """Assemble (H,S) for displaced HO bases and Gaussian-expanded potentials."""
+    """Assemble (H,S) for displaced HO-like bases and Gaussian potentials.
+
+    The algebraic kernels require only local Fock index/center pairs plus the
+    oscillator width. This deliberately avoids depending on real-space basis
+    evaluation methods such as `values()` or `second_derivatives()`.
+    """
 
     def assemble(
         self,
         problem: GaussianExpansionProblem,
-        basis: DisplacedHoBasis,
+        basis: DisplacedHoBasisLike,
     ) -> tuple[np.ndarray, np.ndarray]:
         states = basis.states()
         dim = basis.size()
