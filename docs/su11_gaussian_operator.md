@@ -142,9 +142,59 @@ For centers `A`, `B`, and Gaussian center `C`,
 bra(n,A) exp(-alpha (x-C)^2) ket(m,B)
 ```
 
-can be reduced to centered Gaussian operators plus real displacements. This
-will be introduced only after the centered target has an independent SU(1,1)
-backend and tests.
+can be reduced to centered Gaussian operators plus Heisenberg-Weyl displacements.
+The reduction proceeds by expressing the displaced states in terms of the
+origin-centered harmonic-oscillator basis and then collecting the centered
+Gaussian operator.
+
+**Conventions:**
+
+* Ladder-operator algebra: `[a, adag] = 1`
+* Coordinate operator: `x = (a + adag) / sqrt(2 * omega)`
+* Displaced oscillator basis state: `|n, c⟩ = D(c) |n⟩`, where
+  `D(c) = exp(c a† - c a)` is the Heisenberg-Weyl displacement operator
+  and `c` is a real displacement parameter.
+* Relative displacement between centers `A` and `B`:
+  `beta(A, B) = sqrt(omega / 2) * (B - A)`
+  such that `bra(n, A) ket(m, B) = bra(n) D(beta(A, B)) ket(m)`.
+
+**Decomposition:**
+
+The displaced Gaussian matrix element is **not** a "pure SU(1,1)" quantity.
+It factorizes into:
+
+1. **Displacement** (Heisenberg-Weyl side): the states `|n,A⟩` and `|m,B⟩`
+   bring in the displacement operator `D(beta(A,B))`, evaluated via harmonic
+   oscillator transformation formulas.
+2. **Centered Gaussian operator** (SU(1,1)-consistent side): after state
+   displacement, the operator becomes a centered Gaussian
+   `exp(-alpha (x - C)^2)` expressed in the origin-centered oscillator basis.
+   This part is handled entirely by the existing centered Gaussian APIs
+   `origin_gaussian_matrix_element(...)` or `origin_gaussian_matrix_element_su11(...)`.
+
+The full reduction formula is:
+
+```
+⟨n,A| exp(-alpha (x-C)^2) |m,B⟩ =
+    ⟨n| D(beta(A,B))  exp(-alpha (x - C)^2)  D(beta(A,B))† |m⟩
+```
+
+The inner operator `D(beta) exp(-alpha (x-C)^2) D(beta)†` is a Gaussian centered at
+`(shifted position)` which then reduces to a centered Gaussian matrix element
+once coordinates are appropriately translated. The centered Gaussian matrix
+element is evaluated by the existing centered backends; the displacement algebra
+is handled separately via Heisenberg-Weyl transformations.
+
+**Implementation Roadmap:**
+
+* Centered dual-backend validation (`origin_gaussian_matrix_element_su11`) is
+  complete and tested.
+* The next step is a small helper for displaced reduction: a function that,
+  given `(n, m, omega, alpha, A, B, C)`, computes the displacement parameters
+  and delegates the centered Gaussian matrix element to the existing centered
+  backend.
+* Only after the displaced reduction helper is in place should a full displaced
+  backend implementation be attempted.
 
 ## Implementation Order
 
