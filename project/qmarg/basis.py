@@ -90,7 +90,14 @@ class DisplacedHoBasis:
 
 
 @dataclass(frozen=True)
-class PolynomialGaussianBasis:
+class MonomialGaussianTowerBasis:
+    """Local tower y^n exp(-gamma y^2) at each center.
+
+    This is intentionally not a general contracted Gaussian LCAO basis. For a
+    fixed `gamma`, it spans the same local polynomial-Gaussian tower as a
+    harmonic-oscillator basis with the matching width.
+    """
+
     center_distance: float
     functions_per_center: int
     gamma: float
@@ -99,7 +106,7 @@ class PolynomialGaussianBasis:
         return 2 * self.functions_per_center
 
     def model_name(self) -> str:
-        return f"poly_gaussian_lcao_{self.size()}"
+        return f"monomial_gaussian_tower_{self.size()}"
 
     def parameter_dict(self) -> dict[str, float]:
         return {

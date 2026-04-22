@@ -7,7 +7,7 @@ The current mainstream experiment is:
 
 - reference: finite-difference solution of the 1D two-center soft-Coulomb Hamiltonian
 - model 1: displaced harmonic-oscillator LCAO basis
-- model 2: local polynomial-Gaussian LCAO basis
+- model 2: local monomial-Gaussian tower basis
 - shared matrix assembly: real-space quadrature
 - shared solver: symmetric orthogonalization for `H c = E S c`
 

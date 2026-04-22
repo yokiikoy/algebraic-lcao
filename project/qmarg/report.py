@@ -44,14 +44,14 @@ class ConvergenceRow:
 
 def convergence_table(rows: list[ConvergenceRow]) -> str:
     lines = [
-        "basis model                    opt_param       cond(S)       "
+        "basis model                              opt_param       cond(S)       "
         "E1             err1          E2             err2"
     ]
     for row in rows:
         e1, e2 = row.eigenvalues[:2]
         r1, r2 = row.reference_eigenvalues[:2]
         lines.append(
-            f"{row.basis_size:>5d} {row.model_name:<22s} "
+            f"{row.basis_size:>5d} {row.model_name:<34s} "
             f"{row.opt_param:>10.6f}  {row.condition_number:>11.4e}  "
             f"{e1:>13.10f} {e1 - r1:>+12.6e}  "
             f"{e2:>13.10f} {e2 - r2:>+12.6e}"

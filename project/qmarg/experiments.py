@@ -8,7 +8,7 @@ from qmarg.assembler import RealSpaceMatrixAssembler
 from qmarg.domain import GridSpec, LcaoExperimentResult
 from qmarg.optimization import (
     DisplacedHoBasisFactory,
-    PolynomialGaussianBasisFactory,
+    MonomialGaussianTowerBasisFactory,
     ScalarGridSearchOptimizer,
 )
 from qmarg.problems import TwoCenterSoftCoulombParams, TwoCenterSoftCoulombProblem
@@ -76,7 +76,7 @@ def optimized_models(
 
     factories = [
         DisplacedHoBasisFactory(problem.params.a, functions_per_center),
-        PolynomialGaussianBasisFactory(problem.params.a, functions_per_center),
+        MonomialGaussianTowerBasisFactory(problem.params.a, functions_per_center),
     ]
     return [
         optimizer.optimize(factory, runner, problem, num_states)

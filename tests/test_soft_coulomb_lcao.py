@@ -57,7 +57,7 @@ class SoftCoulombLcaoTest(unittest.TestCase):
         rows = convergence_rows(config, basis_sizes=[2, 8])
 
         by_model = {(row.basis_size, row.model_name): row for row in rows}
-        for prefix in ("displaced_ho", "poly_gaussian_lcao"):
+        for prefix in ("displaced_ho", "monomial_gaussian_tower"):
             low = next(row for key, row in by_model.items() if key[0] == 2 and key[1].startswith(prefix))
             high = next(row for key, row in by_model.items() if key[0] == 8 and key[1].startswith(prefix))
             low_err = abs(low.eigenvalues[0] - low.reference_eigenvalues[0])

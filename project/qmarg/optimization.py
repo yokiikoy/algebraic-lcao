@@ -5,7 +5,7 @@ from typing import Protocol, Sequence
 
 import numpy as np
 
-from qmarg.basis import BasisFunctionSet, DisplacedHoBasis, PolynomialGaussianBasis
+from qmarg.basis import BasisFunctionSet, DisplacedHoBasis, MonomialGaussianTowerBasis
 from qmarg.domain import LcaoExperimentResult
 from qmarg.problems import HamiltonianProblem
 from qmarg.runner import LcaoRunner
@@ -30,12 +30,12 @@ class DisplacedHoBasisFactory:
 
 
 @dataclass(frozen=True)
-class PolynomialGaussianBasisFactory:
+class MonomialGaussianTowerBasisFactory:
     center_distance: float
     functions_per_center: int
 
     def create(self, parameter: float) -> BasisFunctionSet:
-        return PolynomialGaussianBasis(
+        return MonomialGaussianTowerBasis(
             center_distance=self.center_distance,
             functions_per_center=self.functions_per_center,
             gamma=parameter,
