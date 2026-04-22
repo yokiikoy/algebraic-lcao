@@ -130,7 +130,9 @@ origin_gaussian_matrix_element_su11(n, m, omega, alpha)
 ```
 
 It currently covers only `bra(n) G_alpha ket(m)` and is used for dual-backend
-validation against the Hermite-moment target API.
+validation against the Hermite-moment target API. It is a centered Gaussian
+finite-sum backend consistent with the SU(1,1) viewpoint, but not yet an
+explicit SU(1,1) normal-form implementation.
 
 ## General Displaced Target
 

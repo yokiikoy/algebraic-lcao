@@ -30,6 +30,20 @@ class FockSu11Test(unittest.TestCase):
                                 0.0,
                             )
 
+    def test_origin_gaussian_su11_identity_when_alpha_zero(self) -> None:
+        """At alpha=0, exp(-alpha x^2) becomes the identity operator."""
+        omega = 0.8
+        alpha = 0.0
+        for n in range(8):
+            for m in range(8):
+                with self.subTest(omega=omega, n=n, m=m):
+                    expected = 1.0 if n == m else 0.0
+                    self.assertAlmostEqual(
+                        origin_gaussian_matrix_element_su11(n, m, omega, alpha),
+                        expected,
+                        places=14,
+                    )
+
     def test_origin_gaussian_su11_symmetry(self) -> None:
         for omega, alpha in ((0.8, 0.35), (1.2, 0.9)):
             for n in range(8):

@@ -12,8 +12,10 @@ def origin_gaussian_matrix_element_su11(
     """Return <n|exp(-alpha x^2)|m> for the centered oscillator basis.
 
     This is an independent centered backend for the non-unitary Gaussian
-    multiplication operator. It uses the equivalent SU(1,1)/Gaussian generating
-    function finite sum, not the shifted-moment backend in `fock.py`.
+    multiplication operator. It is a centered Gaussian finite-sum backend
+    consistent with the SU(1,1) viewpoint, but not yet an explicit normal-form
+    implementation. The calculation uses the generating function finite sum,
+    not the shifted-moment backend in `fock.py`.
 
     With y = sqrt(omega) x and g = alpha / omega:
 
