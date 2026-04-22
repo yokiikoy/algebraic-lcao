@@ -28,3 +28,8 @@ Check the first algebraic assembler against the existing real-space assembler:
 ```bash
 python3 project/cli/run.py algebraic-check --basis-size 4 --omega 0.8
 ```
+
+The planned Prolog integration is documented in
+[`docs/prolog_plan.md`](docs/prolog_plan.md). Prolog is intended as a symbolic
+formula generator and rule checker; Python remains responsible for numerical
+evaluation, matrix assembly, eigensolvers, and convergence experiments.
