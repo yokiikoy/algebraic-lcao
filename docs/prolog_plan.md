@@ -22,6 +22,7 @@ Prolog responsibilities:
 - encode ladder-operator rewrite rules
 - derive matrix-element finite sums
 - extract selection rules
+- solve index constraints and finite-sum ranges
 - emit simple machine-readable expression terms
 
 Python responsibilities:
@@ -33,6 +34,9 @@ Python responsibilities:
 - run optimization and convergence experiments
 
 Do not move numerical eigensolvers or large matrix evaluation into Prolog.
+Also do not treat Prolog as the final evaluator for special functions. Its
+core role is to generate selection rules, index constraints, finite sums, and
+normal forms that Python can evaluate.
 
 ## Fixed Operator Convention
 
@@ -87,17 +91,43 @@ or a canonical finite expression term.
 Expected formula:
 
 ```text
-a^q |m> = sqrt(m! / (m-q)!) |m-q>,           q <= m
-(adag)^p |m-q> = sqrt((m-q+p)! / (m-q)!) |m-q+p>
+if q > m:
+  <n| (adag)^p a^q |m> = 0
 
-<n| (adag)^p a^q |m>
-  = sqrt(m! (m-q+p)!)/(m-q)! * delta(n, m-q+p)
+if q <= m:
+  a^q |m> = sqrt(m! / (m-q)!) |m-q>
+  (adag)^p |m-q> = sqrt((m-q+p)! / (m-q)!) |m-q+p>
+
+  <n| (adag)^p a^q |m>
+    = sqrt(m! * (m-q+p)!)/(m-q)! * delta(n, m-q+p)
 ```
+
+The `q <= m` condition is part of the formula, not a side note. It should be
+represented explicitly in the Prolog output.
+
+Use a minimal but structured canonical term from the start. The first output
+shape should be simple enough to parse without a full expression language:
+
+```prolog
+me_ladder(N, P, Q, M, zero).
+me_ladder(N, P, Q, M, nonzero(Target, coeff(M, Target, Den))).
+```
+
+where:
+
+- `Target = M - Q + P`
+- `Den = M - Q`
+- `coeff(M, Target, Den)` represents
+  `sqrt(M! * Target!) / Den!`
+
+Python can then evaluate this coefficient directly and assert `N = Target` for
+nonzero cases.
 
 Acceptance criteria:
 
 - exact zero when `q > m`
 - correct delta target `n = m - q + p`
+- stable canonical term shape: `zero` or `nonzero(Target, coeff(M, Target, Den))`
 - Python test compares Prolog output against a direct Python helper for small
   `0 <= n,m,p,q <= 6`
 
@@ -116,10 +146,43 @@ Use the BCH form of `D(beta)` to generate
 The relation should emit a finite sum by applying the primitive delta condition
 instead of expanding an infinite series blindly.
 
+The useful Prolog step is not just expansion. It should solve the delta
+constraint
+
+```text
+n = m - q + p
+```
+
+so
+
+```text
+p = n - m + q.
+```
+
+The apparent double sum over `p,q` then collapses to one finite index range.
+The generator should emit that reduced one-dimensional sum, including the
+allowed range constraints, rather than a two-dimensional sum with a delta
+factor still inside it.
+
+Suggested canonical output shape:
+
+```prolog
+me_displacement(N, M, sum(
+  prefactor(exp_neg_half_beta2),
+  index(Q, QMin, QMax),
+  term(displacement_ladder, PExpr, Q)
+)).
+```
+
+This is only a structural term. Python remains responsible for substituting
+`beta`, evaluating factorials, and summing floating-point terms.
+
 Acceptance criteria:
 
 - generated expression evaluates to the same value as
   `qmarg.fock.displacement_matrix_element`
+- generated expression is a one-index finite sum after applying the delta
+  constraint
 - test grid covers `0 <= n,m <= 6` and several real `beta`
 - canonical output is stable enough for snapshot-like tests
 
@@ -144,19 +207,27 @@ Do not start by asking Prolog to numerically evaluate
 <n|exp(-alpha x^2)|m>
 ```
 
-Instead, use Prolog to derive or check structure:
+Also do not start by asking Prolog to automatically derive the full SU(1,1)
+normal form. That is too large for the first Prolog scope. The normal form
+should be fixed by the theory notes first; Prolog can consume that known
+structure.
 
-- expansion in powers of `x = (a + adag)/sqrt(2)`
+Use Prolog initially to derive or check only lightweight structure:
+
 - parity selection
-- finite polynomial/moment terms for bounded `n,m`
+- index constraints from a known normal form
+- finite-sum ranges from a known normal form
+- optionally bounded expansion checks for small `n,m`
 
-Python remains the evaluator using `ho_gaussian_matrix_element`.
+Python remains the evaluator using `origin_gaussian_matrix_element`,
+`ho_gaussian_matrix_element`, or a future `su11_gaussian_matrix_element`.
 
 Acceptance criteria:
 
-- Prolog can emit the parity rule and bounded term structure
-- Python tests compare Prolog-derived structure with Python matrix elements
-  for small `n,m`
+- Prolog can emit the parity rule
+- Prolog can emit finite-sum range terms from a known SU(1,1) normal form
+- Python tests compare Prolog-derived structure with Python matrix elements for
+  small `n,m`
 
 ### P5: Algebraic assembler provenance
 
@@ -178,6 +249,8 @@ Acceptance criteria:
 - no large floating-point matrix construction in Prolog
 - no replacement of NumPy numerical evaluation
 - no broad symbolic CAS
+- no automatic derivation of the full SU(1,1) Gaussian normal form in the first
+  Prolog milestones
 - no immediate multi-dimensional generalization
 
 ## Recommended Next Task
@@ -193,3 +266,15 @@ That is the smallest useful Prolog slice:
 It tests the operator-algebra representation, validates SWI-Prolog integration,
 and gives a firm base for the displacement operator without taking on the full
 Gaussian operator at once.
+
+The expected progression is:
+
+```text
+P0/P1: ladder primitive and canonical zero/nonzero term
+P2: displacement finite sum reduced to one index by delta constraints
+P3: metadata and selection rules
+P4: Gaussian parity and known-normal-form finite-sum ranges
+```
+
+This keeps Prolog in its strongest role: finite-sum generation, index
+constraints, normal-form bookkeeping, and zero-condition extraction.

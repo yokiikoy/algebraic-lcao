@@ -8,10 +8,10 @@ from qmarg.prolog_bridge import (
     DEFAULT_PROLOG_FILE,
     PrologUnavailable,
     PrologQueryError,
-    parse_ladder_result,
     parse_displacement_finite_sum,
-    query_ladder_matrix_element,
+    parse_ladder_result,
     query_displacement_finite_sum,
+    query_ladder_matrix_element,
     swipl_executable,
 )
 

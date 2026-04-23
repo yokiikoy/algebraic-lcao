@@ -20,10 +20,6 @@ class PrologQueryError(RuntimeError):
     pass
 
 
-# ---------------------------------------------------------------------------
-# Ladder primitive bridge
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class LadderCoefficient:
     source: int
