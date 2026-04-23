@@ -3,11 +3,14 @@ from __future__ import annotations
 import math
 import unittest
 
+from qmarg.fock import displacement_matrix_element
 from qmarg.prolog_bridge import (
     DEFAULT_PROLOG_FILE,
     PrologUnavailable,
     PrologQueryError,
+    parse_displacement_finite_sum,
     parse_ladder_result,
+    query_displacement_finite_sum,
     query_ladder_matrix_element,
     swipl_executable,
 )
@@ -41,6 +44,10 @@ class PrologBridgeTest(unittest.TestCase):
             swipl_executable()
         except PrologUnavailable as exc:
             raise unittest.SkipTest(str(exc)) from exc
+
+    # -------------------------------------------------------------------
+    # Ladder primitive tests
+    # -------------------------------------------------------------------
 
     def test_parse_ladder_zero(self) -> None:
         result = parse_ladder_result("zero\n")
@@ -123,6 +130,75 @@ class PrologBridgeTest(unittest.TestCase):
                     n = target + 1
                     with self.subTest(n=n, p=p, q=q, m=m):
                         self.assertTrue(query_ladder_matrix_element(n, p, q, m).is_zero())
+
+    # -------------------------------------------------------------------
+    # Displacement finite-sum tests
+    # -------------------------------------------------------------------
+
+    def test_parse_displacement_sum(self) -> None:
+        text = (
+            "displacement_sum(prefactor(exp_minus_half_beta_sq),"
+            "[term(p(0),q(1),ladder_coeff(source(3),target(2),denominator(2))),"
+            "term(p(1),q(2),ladder_coeff(source(3),target(2),denominator(1)))])"
+        )
+        result = parse_displacement_finite_sum(text)
+        self.assertEqual(len(result.terms), 2)
+        self.assertEqual(result.terms[0].p, 0)
+        self.assertEqual(result.terms[0].q, 1)
+        self.assertEqual(result.terms[1].p, 1)
+        self.assertEqual(result.terms[1].q, 2)
+
+    def test_displacement_identity_at_zero_beta(self) -> None:
+        """At beta=0, D(0)=I, so <n|D(0)|m> = delta_{n,m}."""
+        for n in range(5):
+            for m in range(5):
+                with self.subTest(n=n, m=m):
+                    result = query_displacement_finite_sum(n, m)
+                    expected = 1.0 if n == m else 0.0
+                    self.assertAlmostEqual(
+                        result.evaluate(0.0), expected, places=14
+                    )
+
+    def test_displacement_matches_closed_form_small_grid(self) -> None:
+        """Prolog-generated finite sum must agree with Python closed form."""
+        for n in range(4):
+            for m in range(4):
+                result = query_displacement_finite_sum(n, m)
+                for beta in (-1.2, -0.3, 0.0, 0.5, 1.5):
+                    with self.subTest(n=n, m=m, beta=beta):
+                        prolog_val = result.evaluate(beta)
+                        direct_val = displacement_matrix_element(n, m, beta)
+                        self.assertAlmostEqual(prolog_val, direct_val, places=12)
+
+    def test_displacement_symmetry(self) -> None:
+        """<n|D(beta)|m> = <m|D(-beta)|n>."""
+        for n in range(5):
+            for m in range(5):
+                for beta in (-1.0, -0.2, 0.7):
+                    with self.subTest(n=n, m=m, beta=beta):
+                        left = query_displacement_finite_sum(n, m).evaluate(beta)
+                        right = query_displacement_finite_sum(m, n).evaluate(-beta)
+                        self.assertAlmostEqual(left, right, places=12)
+
+    def test_displacement_finite_sum_explicit_cases(self) -> None:
+        """Check specific known cases for structure."""
+        # n=0, m=0: only p=0, q=0 term
+        result = query_displacement_finite_sum(0, 0)
+        self.assertEqual(len(result.terms), 1)
+        self.assertEqual(result.terms[0].p, 0)
+        self.assertEqual(result.terms[0].q, 0)
+
+        # n=1, m=0: only p=1, q=0 term
+        result = query_displacement_finite_sum(1, 0)
+        self.assertEqual(len(result.terms), 1)
+        self.assertEqual(result.terms[0].p, 1)
+        self.assertEqual(result.terms[0].q, 0)
+
+        # n=2, m=3: p from max(0, 2-3)=0 to 2
+        result = query_displacement_finite_sum(2, 3)
+        self.assertEqual(len(result.terms), 3)
+        ps = [t.p for t in result.terms]
+        self.assertEqual(ps, [0, 1, 2])
 
 
 if __name__ == "__main__":

@@ -58,3 +58,66 @@ emit_ladder_action(P, Q, M) :-
     ladder_action(P, Q, M, Result),
     write_canonical(Result),
     nl.
+
+% ========================================================================
+% Displacement operator finite-sum generator
+% ========================================================================
+%
+% D(beta) = exp(-beta^2/2) * exp(beta adag) * exp(-beta a)
+%
+% <n | D(beta) | m> = exp(-beta^2/2)
+%   * sum_{p=0}^{infinity} sum_{q=0}^{infinity}
+%       beta^p / p! * (-beta)^q / q! * <n | (adag)^p a^q | m>
+%
+% The ladder primitive <n | (adag)^p a^q | m> is nonzero only when
+% n = m - q + p, i.e. q = m - n + p.
+% This delta constraint reduces the double sum to a single sum over p.
+%
+% For given n, m, the valid p range is:
+%   p >= 0
+%   q = m - n + p >= 0  (automatically satisfied when p >= max(0, n-m))
+%   q <= m  =>  m - n + p <= m  =>  p <= n
+%
+% Therefore p runs from max(0, n-m) to n (inclusive).
+% When p is in range, q = m - n + p and the ladder coefficient is:
+%   sqrt(m! * n!) / (m - q)! = sqrt(m! * n!) / (n - p)!
+
+valid_displacement_args(N, M) :-
+    nonnegative_integer(N),
+    nonnegative_integer(M).
+
+% displacement_finite_sum(+N, +M, -Representation)
+%
+% Emits a canonical representation of the finite-sum structure for
+% <n | D(beta) | m>.  The representation is:
+%
+%   displacement_sum(
+%       prefactor(exp(-beta^2/2)),
+%       terms([
+%           term(p(P), q(Q), ladder_coeff(source(M), target(N), denominator(Den))),
+%           ...
+%       ])
+%   )
+%
+% where each term corresponds to one value of p (and derived q).
+% Python is responsible for evaluating beta^P/P!, (-beta)^Q/Q!, and the
+% ladder coefficient.
+
+displacement_finite_sum(N, M, displacement_sum(prefactor(exp_minus_half_beta_sq), Terms)) :-
+    valid_displacement_args(N, M),
+    P_min is max(0, N - M),
+    P_max is N,
+    findall(
+        term(p(P), q(Q), ladder_coeff(source(M), target(N), denominator(Den))),
+        (
+            between(P_min, P_max, P),
+            Q is M - N + P,
+            Den is M - Q
+        ),
+        Terms
+    ).
+
+emit_displacement_finite_sum(N, M) :-
+    displacement_finite_sum(N, M, Result),
+    write_canonical(Result),
+    nl.
