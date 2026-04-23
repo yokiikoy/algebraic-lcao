@@ -218,3 +218,7 @@ centered backend, then apply the necessary displacement bookkeeping.
 
 The immediate goal is not to delete the Hermite-moment implementation. It is to
 establish a second derivation path that returns the same numbers.
+
+In implementation, operators act on the ket from right to left.
+Therefore, the evaluation order is:
+first apply the right displacement, then the centered Gaussian operator, then the left displacement.
