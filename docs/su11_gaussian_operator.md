@@ -219,6 +219,54 @@ centered backend, then apply the necessary displacement bookkeeping.
 The immediate goal is not to delete the Hermite-moment implementation. It is to
 establish a second derivation path that returns the same numbers.
 
-In implementation, operators act on the ket from right to left.
-Therefore, the evaluation order is:
-first apply the right displacement, then the centered Gaussian operator, then the left displacement.
+## Evaluation Order and Interface
+
+In operator algebra, operators act on the ket from **right to left**.
+For the displaced Gaussian target this means:
+
+1. **First** apply the right displacement `D(β_B - β_C)` to `|m⟩`
+2. **Then** apply the centered Gaussian operator `G_{α,0}`
+3. **Finally** apply the left displacement `D(β_C - β_A)` and contract with `⟨n|`
+
+This produces the three-factor structure:
+
+```
+⟨n,A| G_{α,C} |m,B⟩ = ⟨n| D(β_left) · G_{α,0} · D(β_right) |m⟩
+```
+
+with
+
+```
+β_left  = β_C - β_A = sqrt(omega/2) * (C - A)
+β_right = β_B - β_C = sqrt(omega/2) * (B - C)
+```
+
+### Interface between Prolog and Python
+
+The current codebase separates concerns as follows:
+
+* **Prolog** (term generator): produces the displacement finite-sum structure
+  for `<n | D(beta) | k>` via `displacement_term/5`. It does NOT generate
+  Gaussian operator terms yet.
+
+* **Python** (numerical evaluator): provides the centered Gaussian operator
+  backends `origin_gaussian_matrix_element(...)` and
+  `origin_gaussian_matrix_element_su11(...)`.
+
+* **Composition** (explicit factorization): a small helper
+  `displaced_gaussian_factorization(center_left, center_right, gaussian_center, omega)`
+  returns the `(β_left, β_right)` pair needed by the decomposition above.
+  This makes the interface concrete without replacing any backend.
+
+A future full implementation will assemble:
+
+```
+⟨n| D(β_left) |k⟩   (Prolog-generated or Python closed-form)
+⟨k| G_{α,0} |l⟩     (existing centered Python backend)
+⟨l| D(β_right) |m⟩  (Prolog-generated or Python closed-form)
+```
+
+and contract over intermediate indices `k, l`.
+
+For now, Prolog generates only the displacement side; the Gaussian-operator
+side remains in Python.

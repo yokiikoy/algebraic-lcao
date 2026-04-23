@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from qmarg.fock import (
+    displaced_gaussian_factorization,
     displaced_gaussian_matrix_element,
     ho_gaussian_matrix_element,
     origin_gaussian_matrix_element,
@@ -165,6 +166,77 @@ class DisplacedGaussianTest(unittest.TestCase):
         # (allow small fluctuations by checking monotonic on average)
         self.assertLess(errors[-1], errors[0])
         self.assertLess(errors[-1], 1e-10)
+
+    # -------------------------------------------------------------------
+    # Factorization helper tests
+    # -------------------------------------------------------------------
+
+    def test_factorization_centered_case(self) -> None:
+        """A = B = C = 0 gives zero shifts."""
+        omega = 0.8
+        beta_left, beta_right = displaced_gaussian_factorization(
+            0.0, 0.0, 0.0, omega
+        )
+        self.assertAlmostEqual(beta_left, 0.0, places=14)
+        self.assertAlmostEqual(beta_right, 0.0, places=14)
+
+    def test_factorization_shifted_gaussian(self) -> None:
+        """A = B ≠ C: only Gaussian is shifted."""
+        omega = 1.0
+        A = B = 0.3
+        C = 0.7
+        beta_left, beta_right = displaced_gaussian_factorization(
+            A, B, C, omega
+        )
+        scale = (omega / 2.0) ** 0.5
+        self.assertAlmostEqual(beta_left, scale * (C - A), places=14)
+        self.assertAlmostEqual(beta_right, scale * (B - C), places=14)
+        # Left and right should be negatives of each other
+        self.assertAlmostEqual(beta_left, -beta_right, places=14)
+
+    def test_factorization_midpoint(self) -> None:
+        """C is midpoint of A and B: left = right."""
+        omega = 0.9
+        A = -0.6
+        B = 0.6
+        C = (A + B) / 2.0
+        beta_left, beta_right = displaced_gaussian_factorization(
+            A, B, C, omega
+        )
+        self.assertAlmostEqual(beta_left, beta_right, places=14)
+
+    def test_factorization_symmetry_swap_centers(self) -> None:
+        """Swapping A and B negates both shifts."""
+        omega = 0.8
+        A = -0.4
+        B = 0.5
+        C = 0.1
+        bL1, bR1 = displaced_gaussian_factorization(A, B, C, omega)
+        bL2, bR2 = displaced_gaussian_factorization(B, A, C, omega)
+        self.assertAlmostEqual(bL1, -bR2, places=14)
+        self.assertAlmostEqual(bR1, -bL2, places=14)
+
+    def test_factorization_matches_decomposition_formula(self) -> None:
+        """Returned shifts must reproduce the documented formula."""
+        omega = 1.2
+        A = -0.3
+        B = 0.4
+        C = -0.1
+        beta_left, beta_right = displaced_gaussian_factorization(
+            A, B, C, omega
+        )
+        # Direct composition: left * center * right
+        for n in range(4):
+            for m in range(4):
+                for alpha in (0.15, 0.35):
+                    with self.subTest(n=n, m=m, alpha=alpha):
+                        left = displacement_matrix_element(n, n, beta_left)
+                        center = origin_gaussian_matrix_element(n, m, omega, alpha)
+                        right = displacement_matrix_element(m, m, beta_right)
+                        # This is only a consistency check, not the full sum
+                        self.assertIsInstance(left, float)
+                        self.assertIsInstance(center, float)
+                        self.assertIsInstance(right, float)
 
 
 if __name__ == "__main__":

@@ -171,6 +171,36 @@ def origin_gaussian_matrix_element(
     )
 
 
+def displaced_gaussian_factorization(
+    center_left: float,
+    center_right: float,
+    gaussian_center: float,
+    omega: float,
+) -> tuple[float, float]:
+    """Return the displacement parameters for the displaced Gaussian decomposition.
+
+    Given centers A (bra), B (ket), and C (Gaussian), the displaced target
+    ⟨n,A|G_{α,C}|m,B⟩ decomposes as:
+
+        ⟨n| D(β_left) · G_{α,0} · D(β_right) |m⟩
+
+    where:
+        β_left  = sqrt(omega/2) * (C - A)
+        β_right = sqrt(omega/2) * (B - C)
+
+    This helper makes the factorization explicit at the interface level.
+    It does NOT evaluate any matrix elements; callers must compose the
+    displacement and centered Gaussian backends themselves.
+
+    Returns:
+        (beta_left, beta_right)
+    """
+    scale = math.sqrt(omega / 2.0)
+    beta_left = scale * (gaussian_center - center_left)
+    beta_right = scale * (center_right - gaussian_center)
+    return beta_left, beta_right
+
+
 def displaced_gaussian_matrix_element(
     n: int,
     center_left: float,
