@@ -86,23 +86,6 @@ valid_displacement_args(N, M) :-
     nonnegative_integer(N),
     nonnegative_integer(M).
 
-% displacement_finite_sum(+N, +M, -Representation)
-%
-% Emits a canonical representation of the finite-sum structure for
-% <n | D(beta) | m>.  The representation is:
-%
-%   displacement_sum(
-%       prefactor(exp(-beta^2/2)),
-%       terms([
-%           term(p(P), q(Q), ladder_coeff(source(M), target(N), denominator(Den))),
-%           ...
-%       ])
-%   )
-%
-% where each term corresponds to one value of p (and derived q).
-% Python is responsible for evaluating beta^P/P!, (-beta)^Q/Q!, and the
-% ladder coefficient.
-
 % displacement_term(+N, +M, -P, -Q, -CoeffStruct)
 %
 % Enumerates individual BCH-reduced terms for <n | D(beta) | m>.
