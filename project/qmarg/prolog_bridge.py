@@ -139,12 +139,40 @@ class DisplacementFiniteSum:
         return prefactor * total
 
 
-_DISPLACEMENT_SUM_RE = re.compile(
-    r"^displacement_sum\(prefactor\(exp_minus_half_beta_sq\),\[(.*)\]\)$"
-)
-
 _TERM_RE = re.compile(
     r"term\(p\((\d+)\),q\((\d+)\),ladder_coeff\(source\((\d+)\),target\((\d+)\),denominator\((\d+)\)\)\)"
+)
+
+
+def _parse_term_line(line: str) -> DisplacementTerm:
+    """Parse a single canonical term line from Prolog."""
+    stripped = line.strip()
+    match = _TERM_RE.match(stripped)
+    if match is None:
+        raise ValueError(f"Unsupported Prolog displacement term: {line!r}")
+    p, q, source, target, denominator = (int(part) for part in match.groups())
+    return DisplacementTerm(
+        p=p,
+        q=q,
+        ladder_coefficient=LadderCoefficient(
+            source=source,
+            target=target,
+            denominator=denominator,
+        ),
+    )
+
+
+def parse_displacement_terms(text: str) -> tuple[DisplacementTerm, ...]:
+    """Parse term-by-term output from emit_displacement_term/2 into a tuple."""
+    terms = []
+    for line in text.strip().splitlines():
+        if line.strip():
+            terms.append(_parse_term_line(line))
+    return tuple(terms)
+
+
+_DISPLACEMENT_SUM_RE = re.compile(
+    r"^displacement_sum\(prefactor\(exp_minus_half_beta_sq\),\[(.*)\]\)$"
 )
 
 
@@ -176,12 +204,35 @@ def parse_displacement_finite_sum(text: str) -> DisplacementFiniteSum:
     return DisplacementFiniteSum(terms=tuple(terms))
 
 
+def query_displacement_terms(
+    n: int,
+    m: int,
+    prolog_file: Path = DEFAULT_PROLOG_FILE,
+) -> tuple[DisplacementTerm, ...]:
+    """Request individual BCH-reduced terms for <n | D(beta) | m> from Prolog."""
+    goal = f"emit_displacement_term({n},{m}),halt."
+    try:
+        completed = subprocess.run(
+            [swipl_executable(), "-q", "-s", str(prolog_file), "-g", goal],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise PrologQueryError(
+            "SWI-Prolog query failed: "
+            f"goal={goal!r}, returncode={exc.returncode}, "
+            f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
+        ) from exc
+    return parse_displacement_terms(completed.stdout)
+
+
 def query_displacement_finite_sum(
     n: int,
     m: int,
     prolog_file: Path = DEFAULT_PROLOG_FILE,
 ) -> DisplacementFiniteSum:
-    """Request the Prolog-generated finite-sum representation for <n | D(beta) | m>."""
+    """Request the bundled finite-sum representation for <n | D(beta) | m>."""
     goal = f"emit_displacement_finite_sum({n},{m}),halt."
     try:
         completed = subprocess.run(

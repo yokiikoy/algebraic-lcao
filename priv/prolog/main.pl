@@ -86,34 +86,40 @@ valid_displacement_args(N, M) :-
     nonnegative_integer(N),
     nonnegative_integer(M).
 
-% displacement_finite_sum(+N, +M, -Representation)
+% displacement_term(+N, +M, -P, -Q, -CoeffStruct)
 %
-% Emits a canonical representation of the finite-sum structure for
-% <n | D(beta) | m>.  The representation is:
+% Enumerates individual BCH-reduced terms for <n | D(beta) | m>.
+% Each term exposes:
+%   P, Q  : the summation indices
+%   CoeffStruct : the ladder coefficient skeleton
 %
-%   displacement_sum(
-%       prefactor(exp(-beta^2/2)),
-%       terms([
-%           term(p(P), q(Q), ladder_coeff(source(M), target(N), denominator(Den))),
-%           ...
-%       ])
-%   )
-%
-% where each term corresponds to one value of p (and derived q).
-% Python is responsible for evaluating beta^P/P!, (-beta)^Q/Q!, and the
-% ladder coefficient.
-
-displacement_finite_sum(N, M, displacement_sum(prefactor(exp_minus_half_beta_sq), Terms)) :-
+% On backtracking, returns one term at a time.
+% The caller can collect terms into a list or process them individually.
+displacement_term(N, M, P, Q, ladder_coeff(source(M), target(N), denominator(Den))) :-
     valid_displacement_args(N, M),
     P_min is max(0, N - M),
     P_max is N,
+    between(P_min, P_max, P),
+    Q is M - N + P,
+    Den is M - Q.
+
+emit_displacement_term(N, M) :-
+    displacement_term(N, M, P, Q, Coeff),
+    Term = term(p(P), q(Q), Coeff),
+    write_canonical(Term),
+    nl,
+    fail.
+emit_displacement_term(_, _).
+
+% displacement_finite_sum(+N, +M, -Representation)
+%
+% Bundled finite-sum representation for backward compatibility.
+% Internally collects all terms from displacement_term/5.
+displacement_finite_sum(N, M, displacement_sum(prefactor(exp_minus_half_beta_sq), Terms)) :-
+    valid_displacement_args(N, M),
     findall(
-        term(p(P), q(Q), ladder_coeff(source(M), target(N), denominator(Den))),
-        (
-            between(P_min, P_max, P),
-            Q is M - N + P,
-            Den is M - Q
-        ),
+        term(p(P), q(Q), Coeff),
+        displacement_term(N, M, P, Q, Coeff),
         Terms
     ).
 
