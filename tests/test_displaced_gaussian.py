@@ -140,5 +140,32 @@ class DisplacedGaussianTest(unittest.TestCase):
                 self.assertAlmostEqual(val, expected, places=12)
 
 
+    def test_convergence_with_increasing_cutoff(self) -> None:
+        """Higher cutoff should converge closer to exact kernel."""
+        omega = 0.8
+        alpha = 0.35
+        A = -0.5
+        B = 0.7
+        C = 0.1
+        n, m = 2, 3
+
+        reference = ho_gaussian_matrix_element(
+            n, A, m, B, omega, alpha, C
+        )
+
+        errors = []
+        for cutoff in (5, 10, 20, 40):
+            approx = displaced_gaussian_matrix_element(
+                n, A, m, B, omega, alpha, C, cutoff=cutoff
+            )
+            err = abs(approx - reference)
+            errors.append(err)
+
+        # Errors should generally decrease as cutoff increases
+        # (allow small fluctuations by checking monotonic on average)
+        self.assertLess(errors[-1], errors[0])
+        self.assertLess(errors[-1], 1e-10)
+
+
 if __name__ == "__main__":
     unittest.main()

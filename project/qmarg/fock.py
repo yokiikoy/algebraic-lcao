@@ -179,6 +179,7 @@ def displaced_gaussian_matrix_element(
     omega: float,
     alpha: float,
     gaussian_center: float,
+    cutoff: int | None = None,
 ) -> float:
     """Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using decomposition formula.
     
@@ -186,8 +187,14 @@ def displaced_gaussian_matrix_element(
     ⟨n,A|G_{α,C}|m,B⟩ = ⟨n| D(β_C - β_A) G_{α,0} D(β_B - β_C) |m⟩
     where β_X = sqrt(ω/2) * X and G_{α,0} = exp(-α x²).
     
+    Important: This is a *truncated* double-sum realization of the decomposition.
+    It is **not** an exact closed-form displaced backend. The intermediate states
+    are summed only up to a finite cutoff, so the result is approximate and
+    intended mainly for validation and exploratory use.
+    
     Implementation uses double sum over intermediate states k, l:
-    ∑_k ∑_l ⟨n| D(β_C - β_A) |k⟩ ⟨k| G_{α,0} |l⟩ ⟨l| D(β_B - β_C) |m⟩.
+    ∑_k ∑_l ⟨n| D(β_C - β_A) |k⟩ ⟨k| G_{α,0} |l⟩ ⟨l| D(β_B - β_C) |m⟩
+    truncated to k, l < max(n, m) + cutoff.
     """
     import math
     
@@ -199,7 +206,9 @@ def displaced_gaussian_matrix_element(
     beta_right_op = beta_right - beta_gaussian
     
     max_nm = max(n, m)
-    max_index = max_nm + 20  # truncation for intermediate states
+    if cutoff is None:
+        cutoff = 20
+    max_index = max_nm + cutoff
     
     total = 0.0
     for k in range(max_index):
