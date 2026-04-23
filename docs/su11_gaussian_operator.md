@@ -151,39 +151,47 @@ Gaussian operator.
 
 * Ladder-operator algebra: `[a, adag] = 1`
 * Coordinate operator: `x = (a + adag) / sqrt(2 * omega)`
-* Displaced oscillator basis state: `|n, c⟩ = D(c) |n⟩`, where
-  `D(c) = exp(c a† - c a)` is the Heisenberg-Weyl displacement operator
-  and `c` is a real displacement parameter.
-* Relative displacement between centers `A` and `B`:
-  `beta(A, B) = sqrt(omega / 2) * (B - A)`
-  such that `bra(n, A) ket(m, B) = bra(n) D(beta(A, B)) ket(m)`.
+* Displaced oscillator basis state: `|n, c⟩ = D(β_c) |n⟩`,
+  with `β_c = sqrt(omega / 2) * c`.
+* Displacement operator `D(β) = exp(β a† - β a)` (Heisenberg-Weyl).
 
 **Decomposition:**
 
 The displaced Gaussian matrix element is **not** a "pure SU(1,1)" quantity.
 It factorizes into:
 
-1. **Displacement** (Heisenberg-Weyl side): the states `|n,A⟩` and `|m,B⟩`
-   bring in the displacement operator `D(beta(A,B))`, evaluated via harmonic
-   oscillator transformation formulas.
-2. **Centered Gaussian operator** (SU(1,1)-consistent side): after state
-   displacement, the operator becomes a centered Gaussian
-   `exp(-alpha (x - C)^2)` expressed in the origin-centered oscillator basis.
-   This part is handled entirely by the existing centered Gaussian APIs
-   `origin_gaussian_matrix_element(...)` or `origin_gaussian_matrix_element_su11(...)`.
+1. **Displacement** (Heisenberg-Weyl side): the displaced bra and ket
+   introduce separate displacement operators: `⟨n,A| = ⟨n| D(-β_A)`,
+   `|m,B⟩ = D(β_B)|m⟩`, where `β_A = sqrt(omega / 2) * A`,
+   `β_B = sqrt(omega / 2) * B`.
+2. **Centered Gaussian operator** (SU(1,1)-consistent side):
+   The Gaussian `G_{α,C} = exp(-α (x - C)^2)` can be written as
+   `G_{α,C} = D(β_C) G_{α,0} D(-β_C)` with
+   `β_C = sqrt(omega / 2) * C`.
 
-The full reduction formula is:
+Thus the full decomposition separates the Heisenberg-Weyl (displacement)
+from the centered Gaussian operator (SU(1,1)-consistent):
 
 ```
-⟨n,A| exp(-alpha (x-C)^2) |m,B⟩ =
-    ⟨n| D(beta(A,B))  exp(-alpha (x - C)^2)  D(beta(A,B))† |m⟩
+⟨n,A| G_{α,C} |m,B⟩
+===================================
+
+    = ⟨n| D(-β_A) · D(β_C) G_{α,0} D(-β_C) · D(β_B) |m⟩
+    = ⟨n| D(β_C - β_A)  G_{α,0}  D(β_B - β_C) |m⟩
 ```
 
-The inner operator `D(beta) exp(-alpha (x-C)^2) D(beta)†` is a Gaussian centered at
-`(shifted position)` which then reduces to a centered Gaussian matrix element
-once coordinates are appropriately translated. The centered Gaussian matrix
-element is evaluated by the existing centered backends; the displacement algebra
-is handled separately via Heisenberg-Weyl transformations.
+Here:
+
+* `G_{α,0} = exp(-α x^2)` is the **centered Gaussian operator**,
+  which is handled entirely by the existing centered Gaussian APIs
+  `origin_gaussian_matrix_element(...)` or `origin_gaussian_matrix_element_su11(...)`.
+* The remaining `D(β_C - β_A)` and `D(β_B - β_C)` are **Heisenberg-Weyl
+  displacement operators** that must be evaluated via harmonic-oscillator
+  transformation formulas.
+
+This decomposition clearly shows the strategy for future implementation:
+first compute the centered Gaussian matrix element using the existing
+centered backend, then apply the necessary displacement bookkeeping.
 
 **Implementation Roadmap:**
 
