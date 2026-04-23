@@ -201,3 +201,43 @@ emit_gaussian_term_skeletons(N, M) :-
     nl,
     fail.
 emit_gaussian_term_skeletons(_, _).
+
+% ---------------------------------------------------------------------------
+% Gaussian operator term with coefficient skeleton
+% ---------------------------------------------------------------------------
+%
+% For each valid K, the centered Gaussian matrix element <n | G_alpha | m>
+% contributes one term with the following structural coefficient skeleton:
+%
+%   i = (n - k) / 2
+%   j = (m - k) / 2
+%
+%   normalization: sqrt(n! * m!) / sqrt(2^(n+m)) / sqrt(1 + g)
+%   term factor:   (a^i / i!) * (a^j / j!) * (b^k / k!)
+%
+% where a = -g/(1+g), b = 2/(1+g), g = alpha/omega.
+%
+% Prolog generates only the index skeleton and factorial structure.
+% Python evaluates the numeric coefficients using alpha and omega.
+
+% gaussian_term(+N, +M, -K, -TermStruct)
+%
+% TermStruct = gaussian_term(
+%   k(K),
+%   i(I),
+%   j(J),
+%   factorial_skeleton(num([N, M]), den([I, J, K])),
+%   power_of_two(N_plus_M)
+% )
+gaussian_term(N, M, K, gaussian_term(k(K), i(I), j(J), factorial_skeleton(num([N, M]), den([I, J, K])), power_of_two(N_plus_M))) :-
+    gaussian_term_skeleton(N, M, K),
+    I is (N - K) // 2,
+    J is (M - K) // 2,
+    N_plus_M is N + M.
+
+emit_gaussian_terms(N, M) :-
+    gaussian_term(N, M, _, Term),
+    write_canonical(Term),
+    nl,
+    fail.
+emit_gaussian_terms(_, _).

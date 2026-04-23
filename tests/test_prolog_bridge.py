@@ -9,14 +9,17 @@ from qmarg.prolog_bridge import (
     DEFAULT_PROLOG_FILE,
     PrologUnavailable,
     PrologQueryError,
+    evaluate_gaussian_terms,
     parse_displacement_finite_sum,
     parse_displacement_terms,
     parse_gaussian_term_structure,
     parse_gaussian_term_skeletons,
+    parse_gaussian_terms,
     query_displacement_finite_sum,
     query_displacement_terms,
     query_gaussian_term_structure,
     query_gaussian_term_skeletons,
+    query_gaussian_terms,
     query_ladder_matrix_element,
     parse_ladder_result,
     swipl_executable,
@@ -435,6 +438,80 @@ class PrologBridgeTest(unittest.TestCase):
                     ks = query_gaussian_term_skeletons(n, m)
                     for i in range(1, len(ks)):
                         self.assertEqual(ks[i] - ks[i - 1], 2)
+
+    # -------------------------------------------------------------------
+    # Gaussian operator coefficient term tests
+    # -------------------------------------------------------------------
+
+    def test_parse_gaussian_term(self) -> None:
+        text = (
+            "gaussian_term(k(0),i(1),j(2),"
+            "factorial_skeleton(num([2,4]),den([1,2,0])),power_of_two(6))"
+        )
+        terms = parse_gaussian_terms(text)
+        self.assertEqual(len(terms), 1)
+        term = terms[0]
+        self.assertEqual(term.k, 0)
+        self.assertEqual(term.i, 1)
+        self.assertEqual(term.j, 2)
+        self.assertEqual(term.num_indices, (2, 4))
+        self.assertEqual(term.den_indices, (1, 2, 0))
+        self.assertEqual(term.power_of_two, 6)
+
+    def test_gaussian_terms_parity_fails(self) -> None:
+        """Odd n+m must produce no coefficient terms."""
+        for n in range(5):
+            for m in range(5):
+                if (n + m) % 2 == 1:
+                    with self.subTest(n=n, m=m):
+                        terms = query_gaussian_terms(n, m)
+                        self.assertEqual(len(terms), 0)
+
+    def test_gaussian_terms_evaluates_correctly(self) -> None:
+        """Prolog-generated term sum must match origin_gaussian_matrix_element."""
+        for omega in (0.6, 0.8, 1.2):
+            for alpha in (0.0, 0.15, 0.35, 0.9):
+                for n in range(6):
+                    for m in range(6):
+                        with self.subTest(omega=omega, alpha=alpha, n=n, m=m):
+                            terms = query_gaussian_terms(n, m)
+                            prolog_val = evaluate_gaussian_terms(
+                                terms, omega, alpha
+                            )
+                            direct_val = origin_gaussian_matrix_element(
+                                n, m, omega, alpha
+                            )
+                            self.assertAlmostEqual(
+                                prolog_val, direct_val, places=10
+                            )
+
+    def test_gaussian_term_list_matches_skeleton(self) -> None:
+        """Term generator K values must match skeleton enumeration."""
+        for n in range(6):
+            for m in range(6):
+                if (n + m) % 2 != 0:
+                    continue
+                with self.subTest(n=n, m=m):
+                    skeleton_ks = query_gaussian_term_skeletons(n, m)
+                    terms = query_gaussian_terms(n, m)
+                    term_ks = [t.k for t in terms]
+                    self.assertEqual(term_ks, list(skeleton_ks))
+
+    def test_gaussian_term_structural_fields(self) -> None:
+        """Each term must have structurally consistent i, j, k fields."""
+        for n in range(6):
+            for m in range(6):
+                if (n + m) % 2 != 0:
+                    continue
+                with self.subTest(n=n, m=m):
+                    terms = query_gaussian_terms(n, m)
+                    for term in terms:
+                        self.assertEqual(term.i, (n - term.k) // 2)
+                        self.assertEqual(term.j, (m - term.k) // 2)
+                        self.assertEqual(term.num_indices, (n, m))
+                        self.assertEqual(
+                            term.power_of_two, n + m
+                        )
 
 
 if __name__ == "__main__":
