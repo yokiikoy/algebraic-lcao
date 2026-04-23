@@ -4,14 +4,17 @@ import math
 import unittest
 
 from qmarg.fock import displacement_matrix_element
+from qmarg.fock import origin_gaussian_matrix_element
 from qmarg.prolog_bridge import (
     DEFAULT_PROLOG_FILE,
     PrologUnavailable,
     PrologQueryError,
     parse_displacement_finite_sum,
     parse_displacement_terms,
+    parse_gaussian_term_structure,
     query_displacement_finite_sum,
     query_displacement_terms,
+    query_gaussian_term_structure,
     query_ladder_matrix_element,
     parse_ladder_result,
     swipl_executable,
@@ -288,6 +291,71 @@ class PrologBridgeTest(unittest.TestCase):
                             for t in terms
                         )
                         self.assertAlmostEqual(bundled_val, term_val, places=14)
+
+    # -------------------------------------------------------------------
+    # Gaussian operator term structure tests
+    # -------------------------------------------------------------------
+
+    def test_parse_gaussian_structure(self) -> None:
+        result = parse_gaussian_term_structure(
+            "gaussian_struct(parity(even),allowed(yes))"
+        )
+        self.assertEqual(result.parity, "even")
+        self.assertTrue(result.allowed)
+        self.assertFalse(result.is_zero())
+
+        result = parse_gaussian_term_structure(
+            "gaussian_struct(parity(odd),allowed(no))"
+        )
+        self.assertEqual(result.parity, "odd")
+        self.assertFalse(result.allowed)
+        self.assertTrue(result.is_zero())
+
+    def test_gaussian_parity_rule_even(self) -> None:
+        """Prolog marks even n+m as allowed."""
+        for n in range(6):
+            for m in range(6):
+                if (n + m) % 2 == 0:
+                    with self.subTest(n=n, m=m):
+                        result = query_gaussian_term_structure(n, m)
+                        self.assertEqual(result.parity, "even")
+                        self.assertTrue(result.allowed)
+
+    def test_gaussian_parity_rule_odd(self) -> None:
+        """Prolog marks odd n+m as disallowed (structurally zero)."""
+        for n in range(6):
+            for m in range(6):
+                if (n + m) % 2 == 1:
+                    with self.subTest(n=n, m=m):
+                        result = query_gaussian_term_structure(n, m)
+                        self.assertEqual(result.parity, "odd")
+                        self.assertFalse(result.allowed)
+
+    def test_gaussian_structure_agrees_with_python_backend(self) -> None:
+        """Prolog structural zeros must match Python backend zeros."""
+        omega = 0.8
+        alpha = 0.35
+        for n in range(8):
+            for m in range(8):
+                with self.subTest(n=n, m=m):
+                    prolog_result = query_gaussian_term_structure(n, m)
+                    python_val = origin_gaussian_matrix_element(n, m, omega, alpha)
+                    if prolog_result.is_zero():
+                        self.assertAlmostEqual(python_val, 0.0, places=14)
+                    else:
+                        # Python may return 0.0 for accidental zeros,
+                        # but parity rule is a necessary condition
+                        self.assertNotEqual(prolog_result.parity, "odd")
+
+    def test_gaussian_no_false_positives(self) -> None:
+        """Prolog must never mark an odd-parity pair as allowed."""
+        for n in range(10):
+            for m in range(10):
+                with self.subTest(n=n, m=m):
+                    result = query_gaussian_term_structure(n, m)
+                    if (n + m) % 2 == 1:
+                        self.assertFalse(result.allowed)
+                        self.assertTrue(result.is_zero())
 
 
 if __name__ == "__main__":

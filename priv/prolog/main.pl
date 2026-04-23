@@ -127,3 +127,32 @@ emit_displacement_finite_sum(N, M) :-
     displacement_finite_sum(N, M, Result),
     write_canonical(Result),
     nl.
+
+% ========================================================================
+% Gaussian operator term structure
+% ========================================================================
+%
+% For the centered Gaussian operator G_alpha = exp(-alpha x^2),
+% the matrix element <n | G_alpha | m> has structural constraints.
+% This module captures only parity and index structure, NOT coefficients.
+
+% gaussian_term_structure(+N, +M, -Parity, -Allowed)
+%
+% Parity:   even   if N + M is even (term may be nonzero)
+%           odd    if N + M is odd  (term is structurally zero)
+% Allowed:  yes    if Parity = even and N, M >= 0
+%           no     otherwise
+gaussian_term_structure(N, M, even, yes) :-
+    nonnegative_integer(N),
+    nonnegative_integer(M),
+    0 is (N + M) mod 2.
+gaussian_term_structure(N, M, odd, no) :-
+    nonnegative_integer(N),
+    nonnegative_integer(M),
+    1 is (N + M) mod 2.
+
+emit_gaussian_term_structure(N, M) :-
+    gaussian_term_structure(N, M, Parity, Allowed),
+    Result = gaussian_struct(parity(Parity), allowed(Allowed)),
+    write_canonical(Result),
+    nl.
