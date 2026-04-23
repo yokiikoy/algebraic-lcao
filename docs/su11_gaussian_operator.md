@@ -123,6 +123,17 @@ origin_gaussian_matrix_element(n, m, omega, alpha)
 and delegates to the Hermite-moment backend until the SU(1,1) normal-form
 backend is implemented.
 
+The independent centered comparison backend is
+
+```text
+origin_gaussian_matrix_element_su11(n, m, omega, alpha)
+```
+
+It currently covers only `bra(n) G_alpha ket(m)` and is used for dual-backend
+validation against the Hermite-moment target API. It is a centered Gaussian
+finite-sum backend consistent with the SU(1,1) viewpoint, but not yet an
+explicit SU(1,1) normal-form implementation.
+
 ## General Displaced Target
 
 For centers `A`, `B`, and Gaussian center `C`,
@@ -131,9 +142,67 @@ For centers `A`, `B`, and Gaussian center `C`,
 bra(n,A) exp(-alpha (x-C)^2) ket(m,B)
 ```
 
-can be reduced to centered Gaussian operators plus real displacements. This
-will be introduced only after the centered target has an independent SU(1,1)
-backend and tests.
+can be reduced to centered Gaussian operators plus Heisenberg-Weyl displacements.
+The reduction proceeds by expressing the displaced states in terms of the
+origin-centered harmonic-oscillator basis and then collecting the centered
+Gaussian operator.
+
+**Conventions:**
+
+* Ladder-operator algebra: `[a, adag] = 1`
+* Coordinate operator: `x = (a + adag) / sqrt(2 * omega)`
+* Displaced oscillator basis state: `|n, c⟩ = D(β_c) |n⟩`,
+  with `β_c = sqrt(omega / 2) * c`.
+* Displacement operator `D(β) = exp(β a† - β a)` (Heisenberg-Weyl).
+
+**Decomposition:**
+
+The displaced Gaussian matrix element is **not** a "pure SU(1,1)" quantity.
+It factorizes into:
+
+1. **Displacement** (Heisenberg-Weyl side): the displaced bra and ket
+   introduce separate displacement operators: `⟨n,A| = ⟨n| D(-β_A)`,
+   `|m,B⟩ = D(β_B)|m⟩`, where `β_A = sqrt(omega / 2) * A`,
+   `β_B = sqrt(omega / 2) * B`.
+2. **Centered Gaussian operator** (SU(1,1)-consistent side):
+   The Gaussian `G_{α,C} = exp(-α (x - C)^2)` can be written as
+   `G_{α,C} = D(β_C) G_{α,0} D(-β_C)` with
+   `β_C = sqrt(omega / 2) * C`.
+
+Thus the full decomposition separates the Heisenberg-Weyl (displacement)
+from the centered Gaussian operator (SU(1,1)-consistent):
+
+```
+⟨n,A| G_{α,C} |m,B⟩
+===================================
+
+    = ⟨n| D(-β_A) · D(β_C) G_{α,0} D(-β_C) · D(β_B) |m⟩
+    = ⟨n| D(β_C - β_A)  G_{α,0}  D(β_B - β_C) |m⟩
+```
+
+Here:
+
+* `G_{α,0} = exp(-α x^2)` is the **centered Gaussian operator**,
+  which is handled entirely by the existing centered Gaussian APIs
+  `origin_gaussian_matrix_element(...)` or `origin_gaussian_matrix_element_su11(...)`.
+* The remaining `D(β_C - β_A)` and `D(β_B - β_C)` are **Heisenberg-Weyl
+  displacement operators** that must be evaluated via harmonic-oscillator
+  transformation formulas.
+
+This decomposition clearly shows the strategy for future implementation:
+first compute the centered Gaussian matrix element using the existing
+centered backend, then apply the necessary displacement bookkeeping.
+
+**Implementation Roadmap:**
+
+* Centered dual-backend validation (`origin_gaussian_matrix_element_su11`) is
+  complete and tested.
+* The next step is a small helper for displaced reduction: a function that,
+  given `(n, m, omega, alpha, A, B, C)`, computes the displacement parameters
+  and delegates the centered Gaussian matrix element to the existing centered
+  backend.
+* Only after the displaced reduction helper is in place should a full displaced
+  backend implementation be attempted.
 
 ## Implementation Order
 
@@ -149,3 +218,7 @@ backend and tests.
 
 The immediate goal is not to delete the Hermite-moment implementation. It is to
 establish a second derivation path that returns the same numbers.
+
+In implementation, operators act on the ket from right to left.
+Therefore, the evaluation order is:
+first apply the right displacement, then the centered Gaussian operator, then the left displacement.
