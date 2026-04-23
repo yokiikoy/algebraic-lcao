@@ -165,11 +165,6 @@ def parse_displacement_finite_sum(text: str) -> DisplacementFiniteSum:
     terms = []
     for term_match in _TERM_RE.finditer(terms_text):
         p, q, source, target, denominator = (int(part) for part in term_match.groups())
-        if source != target:
-            # In the displacement sum the source and target are always the same
-            # because the delta constraint forces n = m - q + p, and the
-            # ladder coefficient denominator is m - q = n - p.
-            pass
         terms.append(
             DisplacementTerm(
                 p=p,
