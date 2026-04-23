@@ -9,9 +9,11 @@ from qmarg.prolog_bridge import (
     PrologUnavailable,
     PrologQueryError,
     parse_displacement_finite_sum,
-    parse_ladder_result,
+    parse_displacement_terms,
     query_displacement_finite_sum,
+    query_displacement_terms,
     query_ladder_matrix_element,
+    parse_ladder_result,
     swipl_executable,
 )
 
@@ -199,6 +201,93 @@ class PrologBridgeTest(unittest.TestCase):
         self.assertEqual(len(result.terms), 3)
         ps = [t.p for t in result.terms]
         self.assertEqual(ps, [0, 1, 2])
+
+    # -------------------------------------------------------------------
+    # Displacement term-generator tests
+    # -------------------------------------------------------------------
+
+    def test_term_generator_reconstructs_finite_sum(self) -> None:
+        """Term-by-term enumeration must match the bundled finite-sum path."""
+        for n in range(5):
+            for m in range(5):
+                with self.subTest(n=n, m=m):
+                    bundled = query_displacement_finite_sum(n, m)
+                    terms = query_displacement_terms(n, m)
+                    self.assertEqual(len(terms), len(bundled.terms))
+                    for i, term in enumerate(terms):
+                        bundled_term = bundled.terms[i]
+                        self.assertEqual(term.p, bundled_term.p)
+                        self.assertEqual(term.q, bundled_term.q)
+                        self.assertEqual(
+                            term.ladder_coefficient.source,
+                            bundled_term.ladder_coefficient.source,
+                        )
+                        self.assertEqual(
+                            term.ladder_coefficient.target,
+                            bundled_term.ladder_coefficient.target,
+                        )
+                        self.assertEqual(
+                            term.ladder_coefficient.denominator,
+                            bundled_term.ladder_coefficient.denominator,
+                        )
+
+    def test_term_generator_evaluates_correctly(self) -> None:
+        """Reconstructing the sum from individual terms must match closed form."""
+        for n in range(4):
+            for m in range(4):
+                terms = query_displacement_terms(n, m)
+                for beta in (-1.2, -0.3, 0.0, 0.5, 1.5):
+                    with self.subTest(n=n, m=m, beta=beta):
+                        prefactor = math.exp(-0.5 * beta ** 2)
+                        total = sum(
+                            term.evaluate_beta_factor(beta)
+                            * term.ladder_coefficient.evaluate()
+                            for term in terms
+                        )
+                        reconstructed = prefactor * total
+                        direct = displacement_matrix_element(n, m, beta)
+                        self.assertAlmostEqual(reconstructed, direct, places=12)
+
+    def test_term_generator_structural_consistency(self) -> None:
+        """Each term must satisfy the BCH delta constraint q = m - n + p."""
+        for n in range(5):
+            for m in range(5):
+                with self.subTest(n=n, m=m):
+                    terms = query_displacement_terms(n, m)
+                    for term in terms:
+                        self.assertEqual(term.q, m - n + term.p)
+
+    def test_term_generator_identity_at_zero_beta(self) -> None:
+        """At beta=0, D(0)=I, so the reconstructed sum must give delta_{n,m}."""
+        for n in range(5):
+            for m in range(5):
+                with self.subTest(n=n, m=m):
+                    terms = query_displacement_terms(n, m)
+                    prefactor = math.exp(-0.5 * 0.0 ** 2)
+                    total = sum(
+                        term.evaluate_beta_factor(0.0)
+                        * term.ladder_coefficient.evaluate()
+                        for term in terms
+                    )
+                    expected = 1.0 if n == m else 0.0
+                    self.assertAlmostEqual(prefactor * total, expected, places=14)
+
+    def test_term_generator_matches_bundled_evaluation(self) -> None:
+        """Both paths must give identical numerical results for all beta."""
+        for n in range(4):
+            for m in range(4):
+                bundled = query_displacement_finite_sum(n, m)
+                terms = query_displacement_terms(n, m)
+                for beta in (-0.7, 0.0, 0.3):
+                    with self.subTest(n=n, m=m, beta=beta):
+                        bundled_val = bundled.evaluate(beta)
+                        prefactor = math.exp(-0.5 * beta ** 2)
+                        term_val = prefactor * sum(
+                            t.evaluate_beta_factor(beta)
+                            * t.ladder_coefficient.evaluate()
+                            for t in terms
+                        )
+                        self.assertAlmostEqual(bundled_val, term_val, places=14)
 
 
 if __name__ == "__main__":
