@@ -12,9 +12,11 @@ from qmarg.prolog_bridge import (
     parse_displacement_finite_sum,
     parse_displacement_terms,
     parse_gaussian_term_structure,
+    parse_gaussian_term_skeletons,
     query_displacement_finite_sum,
     query_displacement_terms,
     query_gaussian_term_structure,
+    query_gaussian_term_skeletons,
     query_ladder_matrix_element,
     parse_ladder_result,
     swipl_executable,
@@ -356,6 +358,83 @@ class PrologBridgeTest(unittest.TestCase):
                     if (n + m) % 2 == 1:
                         self.assertFalse(result.allowed)
                         self.assertTrue(result.is_zero())
+
+    # -------------------------------------------------------------------
+    # Gaussian operator term skeleton tests
+    # -------------------------------------------------------------------
+
+    def test_parse_gaussian_skeleton(self) -> None:
+        text = "gaussian_skeleton(k(0))\ngaussian_skeleton(k(2))"
+        result = parse_gaussian_term_skeletons(text)
+        self.assertEqual(result, (0, 2))
+
+    def test_gaussian_skeleton_parity_fails(self) -> None:
+        """Odd n+m must produce no skeleton terms."""
+        for n in range(5):
+            for m in range(5):
+                if (n + m) % 2 == 1:
+                    with self.subTest(n=n, m=m):
+                        ks = query_gaussian_term_skeletons(n, m)
+                        self.assertEqual(len(ks), 0)
+
+    def test_gaussian_skeleton_even_parity_has_terms(self) -> None:
+        """Even n+m must produce at least one skeleton term."""
+        for n in range(5):
+            for m in range(5):
+                if (n + m) % 2 == 0:
+                    with self.subTest(n=n, m=m):
+                        ks = query_gaussian_term_skeletons(n, m)
+                        self.assertGreater(len(ks), 0)
+
+    def test_gaussian_skeleton_bounds(self) -> None:
+        """Each K must satisfy 0 <= K <= min(n,m)."""
+        for n in range(8):
+            for m in range(8):
+                if (n + m) % 2 != 0:
+                    continue
+                with self.subTest(n=n, m=m):
+                    ks = query_gaussian_term_skeletons(n, m)
+                    for k in ks:
+                        self.assertGreaterEqual(k, 0)
+                        self.assertLessEqual(k, min(n, m))
+
+    def test_gaussian_skeleton_parity_of_differences(self) -> None:
+        """Each K must make (n-K) and (m-K) even."""
+        for n in range(8):
+            for m in range(8):
+                if (n + m) % 2 != 0:
+                    continue
+                with self.subTest(n=n, m=m):
+                    ks = query_gaussian_term_skeletons(n, m)
+                    for k in ks:
+                        self.assertEqual((n - k) % 2, 0)
+                        self.assertEqual((m - k) % 2, 0)
+
+    def test_gaussian_skeleton_matches_python_backend_support(self) -> None:
+        """Prolog skeleton indices must match Python backend term support."""
+        for n in range(6):
+            for m in range(6):
+                if (n + m) % 2 != 0:
+                    continue
+                with self.subTest(n=n, m=m):
+                    ks = query_gaussian_term_skeletons(n, m)
+                    # fock_su11.py uses k in range(min(n,m)+1) with even-step filter
+                    python_ks = []
+                    for k in range(min(n, m) + 1):
+                        if (n - k) % 2 == 0 and (m - k) % 2 == 0:
+                            python_ks.append(k)
+                    self.assertEqual(list(ks), python_ks)
+
+    def test_gaussian_skeleton_monotonic(self) -> None:
+        """Skeleton K values should be strictly increasing by 2."""
+        for n in range(6):
+            for m in range(6):
+                if (n + m) % 2 != 0:
+                    continue
+                with self.subTest(n=n, m=m):
+                    ks = query_gaussian_term_skeletons(n, m)
+                    for i in range(1, len(ks)):
+                        self.assertEqual(ks[i] - ks[i - 1], 2)
 
 
 if __name__ == "__main__":

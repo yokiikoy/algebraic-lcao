@@ -301,3 +301,47 @@ def query_gaussian_term_structure(
             f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
         ) from exc
     return parse_gaussian_term_structure(completed.stdout)
+
+
+# ---------------------------------------------------------------------------
+# Gaussian operator term skeleton bridge
+# ---------------------------------------------------------------------------
+
+_GAUSSIAN_SKELETON_RE = re.compile(r"^gaussian_skeleton\(k\((\d+)\)\)$")
+
+
+def parse_gaussian_term_skeletons(text: str) -> tuple[int, ...]:
+    """Parse term-by-term skeleton output from emit_gaussian_term_skeletons/2."""
+    ks = []
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        match = _GAUSSIAN_SKELETON_RE.match(line)
+        if match is None:
+            raise ValueError(f"Unsupported Prolog Gaussian skeleton result: {line!r}")
+        ks.append(int(match.group(1)))
+    return tuple(ks)
+
+
+def query_gaussian_term_skeletons(
+    n: int,
+    m: int,
+    prolog_file: Path = DEFAULT_PROLOG_FILE,
+) -> tuple[int, ...]:
+    """Request all valid summation indices K for <n | G_alpha | m> from Prolog."""
+    goal = f"emit_gaussian_term_skeletons({n},{m}),halt."
+    try:
+        completed = subprocess.run(
+            [swipl_executable(), "-q", "-s", str(prolog_file), "-g", goal],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise PrologQueryError(
+            "SWI-Prolog query failed: "
+            f"goal={goal!r}, returncode={exc.returncode}, "
+            f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
+        ) from exc
+    return parse_gaussian_term_skeletons(completed.stdout)
