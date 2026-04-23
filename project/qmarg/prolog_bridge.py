@@ -248,3 +248,56 @@ def query_displacement_finite_sum(
             f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
         ) from exc
     return parse_displacement_finite_sum(completed.stdout)
+
+
+# ---------------------------------------------------------------------------
+# Gaussian operator term structure bridge
+# ---------------------------------------------------------------------------
+
+_GAUSSIAN_STRUCT_RE = re.compile(
+    r"^gaussian_struct\(parity\((even|odd)\),allowed\((yes|no)\)\)$"
+)
+
+
+@dataclass(frozen=True)
+class GaussianTermStructure:
+    parity: str
+    allowed: bool
+
+    def is_zero(self) -> bool:
+        return not self.allowed
+
+
+def parse_gaussian_term_structure(text: str) -> GaussianTermStructure:
+    stripped = text.strip()
+    match = _GAUSSIAN_STRUCT_RE.match(stripped)
+    if match is None:
+        raise ValueError(f"Unsupported Prolog Gaussian structure result: {text!r}")
+    parity_str, allowed_str = match.groups()
+    return GaussianTermStructure(
+        parity=parity_str,
+        allowed=(allowed_str == "yes"),
+    )
+
+
+def query_gaussian_term_structure(
+    n: int,
+    m: int,
+    prolog_file: Path = DEFAULT_PROLOG_FILE,
+) -> GaussianTermStructure:
+    """Request structural information for <n | G_alpha | m> from Prolog."""
+    goal = f"emit_gaussian_term_structure({n},{m}),halt."
+    try:
+        completed = subprocess.run(
+            [swipl_executable(), "-q", "-s", str(prolog_file), "-g", goal],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise PrologQueryError(
+            "SWI-Prolog query failed: "
+            f"goal={goal!r}, returncode={exc.returncode}, "
+            f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
+        ) from exc
+    return parse_gaussian_term_structure(completed.stdout)
