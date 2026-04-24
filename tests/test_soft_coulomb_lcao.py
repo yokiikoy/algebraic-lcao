@@ -42,6 +42,51 @@ class SoftCoulombLcaoTest(unittest.TestCase):
         self.assertTrue(np.allclose(alg_s, real_s, atol=1e-11, rtol=1e-11))
         self.assertTrue(np.allclose(alg_h, real_h, atol=1e-11, rtol=1e-11))
 
+    def test_truncated_prolog_backend_matches_real_space(self) -> None:
+        """algebraic_truncated backend should agree with real_space within cutoff tolerance."""
+        basis = DisplacedHoBasis(center_distance=1.5, functions_per_center=2, omega=0.8)
+        problem = GaussianExpansionProblem(
+            (
+                GaussianPotentialTerm(coefficient=-0.7, exponent=0.35, center=-1.5),
+                GaussianPotentialTerm(coefficient=-1.1, exponent=1.25, center=1.5),
+            )
+        )
+
+        quadrature = GaussHermiteQuadrature(180)
+        real_h, real_s = RealSpaceMatrixAssembler(quadrature).assemble(problem, basis)
+        trunc_h, trunc_s = RealSpaceMatrixAssembler(
+            quadrature, backend="algebraic_truncated", cutoff=12
+        ).assemble(problem, basis)
+
+        # Overlap matrix is exact (no truncation involved)
+        self.assertTrue(np.allclose(real_s, trunc_s, atol=1e-12, rtol=1e-12))
+        # Hamiltonian matrix difference is controlled by cutoff
+        diff_h = float(np.max(np.abs(real_h - trunc_h)))
+        self.assertLess(diff_h, 1e-3)
+
+    def test_truncated_prolog_backend_higher_cutoff(self) -> None:
+        """Higher cutoff should reduce the real_space vs truncated discrepancy."""
+        basis = DisplacedHoBasis(center_distance=1.5, functions_per_center=2, omega=0.8)
+        problem = GaussianExpansionProblem(
+            (
+                GaussianPotentialTerm(coefficient=-0.7, exponent=0.35, center=-1.5),
+                GaussianPotentialTerm(coefficient=-1.1, exponent=1.25, center=1.5),
+            )
+        )
+
+        quadrature = GaussHermiteQuadrature(180)
+        real_h, _ = RealSpaceMatrixAssembler(quadrature).assemble(problem, basis)
+        low_h, _ = RealSpaceMatrixAssembler(
+            quadrature, backend="algebraic_truncated", cutoff=4
+        ).assemble(problem, basis)
+        high_h, _ = RealSpaceMatrixAssembler(
+            quadrature, backend="algebraic_truncated", cutoff=14
+        ).assemble(problem, basis)
+
+        low_diff = float(np.max(np.abs(real_h - low_h)))
+        high_diff = float(np.max(np.abs(real_h - high_h)))
+        self.assertLess(high_diff, low_diff)
+
     def test_four_basis_comparison_runs(self) -> None:
         config = ExperimentConfig(grid_points=500, quadrature_order=120, candidate_count=9)
         summary = compare_basis_size(config, basis_size=4)

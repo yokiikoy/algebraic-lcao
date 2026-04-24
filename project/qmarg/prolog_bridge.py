@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 import math
 import re
@@ -204,6 +205,7 @@ def parse_displacement_finite_sum(text: str) -> DisplacementFiniteSum:
     return DisplacementFiniteSum(terms=tuple(terms))
 
 
+@lru_cache(maxsize=None)
 def query_displacement_terms(
     n: int,
     m: int,
@@ -460,6 +462,7 @@ def parse_gaussian_terms(text: str) -> tuple[GaussianTerm, ...]:
     return tuple(terms)
 
 
+@lru_cache(maxsize=None)
 def query_gaussian_terms(
     n: int,
     m: int,
