@@ -468,7 +468,14 @@ class PrologBridgeTest(unittest.TestCase):
                         self.assertEqual(len(terms), 0)
 
     def test_gaussian_terms_evaluates_correctly(self) -> None:
-        """Prolog-generated term sum must match origin_gaussian_matrix_element."""
+        """Prolog-generated term sum must match origin_gaussian_matrix_element.
+
+        Note: the Prolog skeleton represents *structural support* (parity and
+        index constraints), not necessarily numerically nonzero terms. For
+        special parameter values such as alpha=0 some structurally allowed
+        terms may evaluate to zero numerically. This test checks structural
+        correctness of the reconstructed sum.
+        """
         for omega in (0.6, 0.8, 1.2):
             for alpha in (0.0, 0.15, 0.35, 0.9):
                 for n in range(6):
@@ -512,6 +519,26 @@ class PrologBridgeTest(unittest.TestCase):
                         self.assertEqual(
                             term.power_of_two, n + m
                         )
+
+    def test_gaussian_term_parser_rejects_malformed_den(self) -> None:
+        """Parser must reject mismatched denominator indices."""
+        bad_text = (
+            "gaussian_term(k(0),i(1),j(2),"
+            "factorial_skeleton(num([2,4]),den([1,99,0])),power_of_two(6))"
+        )
+        with self.assertRaises(ValueError) as caught:
+            parse_gaussian_terms(bad_text)
+        self.assertIn("den_indices", str(caught.exception))
+
+    def test_gaussian_term_parser_rejects_malformed_pow2(self) -> None:
+        """Parser must reject mismatched power_of_two."""
+        bad_text = (
+            "gaussian_term(k(0),i(1),j(2),"
+            "factorial_skeleton(num([2,4]),den([1,2,0])),power_of_two(99))"
+        )
+        with self.assertRaises(ValueError) as caught:
+            parse_gaussian_terms(bad_text)
+        self.assertIn("power_of_two", str(caught.exception))
 
 
 if __name__ == "__main__":

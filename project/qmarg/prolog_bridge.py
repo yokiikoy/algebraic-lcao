@@ -412,14 +412,37 @@ def parse_gaussian_terms(text: str) -> tuple[GaussianTerm, ...]:
         if match is None:
             raise ValueError(f"Unsupported Prolog Gaussian term result: {line!r}")
         k, i, j, num_str, den_str, pow2 = match.groups()
+        k_val = int(k)
+        i_val = int(i)
+        j_val = int(j)
+        den_indices = _parse_int_list(den_str)
+        pow2_val = int(pow2)
+
+        # Hardening: validate structural consistency
+        expected_den = (i_val, j_val, k_val)
+        if den_indices != expected_den:
+            raise ValueError(
+                f"Malformed Prolog Gaussian term: den_indices {den_indices} "
+                f"!= expected {expected_den} in line: {line!r}"
+            )
+
+        num_indices = _parse_int_list(num_str)
+        n, m = num_indices
+        expected_pow2 = n + m
+        if pow2_val != expected_pow2:
+            raise ValueError(
+                f"Malformed Prolog Gaussian term: power_of_two {pow2_val} "
+                f"!= expected {expected_pow2} (n+m) in line: {line!r}"
+            )
+
         terms.append(
             GaussianTerm(
-                k=int(k),
-                i=int(i),
-                j=int(j),
-                num_indices=_parse_int_list(num_str),
-                den_indices=_parse_int_list(den_str),
-                power_of_two=int(pow2),
+                k=k_val,
+                i=i_val,
+                j=j_val,
+                num_indices=num_indices,
+                den_indices=den_indices,
+                power_of_two=pow2_val,
             )
         )
     return tuple(terms)
