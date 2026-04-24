@@ -201,7 +201,100 @@ def displaced_gaussian_factorization(
     return beta_left, beta_right
 
 
-def displaced_gaussian_matrix_element(
+def _evaluate_displacement_terms(
+    terms: tuple, beta: float
+) -> float:
+    """Evaluate displacement finite sum from Prolog terms:
+    exp(-beta^2/2) * Σ_term beta^p/p! * (-beta)^q/q! * sqrt(source! * target!) / den!.
+    """
+    import math
+
+    prefactor = math.exp(-0.5 * beta ** 2)
+    total = 0.0
+    for term in terms:
+        total += (
+            term.evaluate_beta_factor(beta) * term.ladder_coefficient.evaluate()
+        )
+    return prefactor * total
+
+
+def displaced_gaussian_matrix_element_truncated_prolog(
+    n: int,
+    center_left: float,
+    m: int,
+    center_right: float,
+    omega: float,
+    alpha: float,
+    gaussian_center: float,
+    cutoff: int = 12,
+) -> float:
+    """
+    Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ via explicit triple sum over intermediate
+    oscillator states.
+
+    This is a **truncated** expansion intended as a validation/exploratory
+    backend, not an exact closed-form evaluator. The `cutoff` parameter controls
+    the truncation of intermediate states: the upper bound for the intermediate
+    indices i and j is M = max(n, m) + cutoff (inclusive). Larger `cutoff` values
+    should improve accuracy at increased computational cost. This backend is
+    designed for validation and exploration, not for final exact assembly.
+
+    Decomposition:
+        ⟨n,A|G_{α,C}|m,B⟩ = ⟨n| D(β_L) G_{α,0} D(β_R) |m⟩
+    where β_L = √(ω/2) (C - A), β_R = √(ω/2) (B - C).
+
+    Expansion:
+        Σ_{i=0}^{M} Σ_{j=0}^{M}
+            ⟨n|D(β_L)|i⟩ ⟨i|G_{α,0}|j⟩ ⟨j|D(β_R)|m⟩
+    with M = max(n, m) + cutoff (inclusive upper bound).
+
+    Each factor is evaluated via Prolog-generated algebraic terms:
+      - Displacement terms from query_displacement_terms
+      - Gaussian terms from query_gaussian_terms
+    """
+    from qmarg.prolog_bridge import (
+        evaluate_gaussian_terms,
+        query_displacement_terms,
+        query_gaussian_terms,
+    )
+
+    beta_left, beta_right = displaced_gaussian_factorization(
+        center_left, center_right, gaussian_center, omega
+    )
+
+    max_index = max(n, m) + cutoff
+
+    displacement_cache: dict[tuple[int, int], tuple] = {}
+    gaussian_cache: dict[tuple[int, int], tuple] = {}
+
+    total = 0.0
+    for i in range(max_index + 1):
+        key_left = (n, i)
+        if key_left not in displacement_cache:
+            displacement_cache[key_left] = query_displacement_terms(n, i)
+        left_terms = displacement_cache[key_left]
+        left_val = _evaluate_displacement_terms(left_terms, beta_left)
+        if left_val == 0.0:
+            continue
+        for j in range(max_index + 1):
+            key_gauss = (i, j)
+            if key_gauss not in gaussian_cache:
+                gaussian_cache[key_gauss] = query_gaussian_terms(i, j)
+            gauss_terms = gaussian_cache[key_gauss]
+            gauss_val = evaluate_gaussian_terms(gauss_terms, omega, alpha)
+            if gauss_val == 0.0:
+                continue
+            key_right = (j, m)
+            if key_right not in displacement_cache:
+                displacement_cache[key_right] = query_displacement_terms(j, m)
+            right_terms = displacement_cache[key_right]
+            right_val = _evaluate_displacement_terms(right_terms, beta_right)
+            total += left_val * gauss_val * right_val
+
+    return total
+
+
+def displaced_gaussian_matrix_element_truncated(
     n: int,
     center_left: float,
     m: int,
@@ -211,48 +304,58 @@ def displaced_gaussian_matrix_element(
     gaussian_center: float,
     cutoff: int | None = None,
 ) -> float:
-    """Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using decomposition formula.
+    """
+    Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using a truncated intermediate-state expansion.
     
-    Decomposition formula from docs/su11_gaussian_operator.md:
-    ⟨n,A|G_{α,C}|m,B⟩ = ⟨n| D(β_C - β_A) G_{α,0} D(β_B - β_C) |m⟩
-    where β_X = sqrt(ω/2) * X and G_{α,0} = exp(-α x²).
-    
-    Important: This is a *truncated* double-sum realization of the decomposition.
-    It is **not** an exact closed-form displaced backend. The intermediate states
-    are summed only up to a finite cutoff, so the result is approximate and
-    intended mainly for validation and exploratory use.
-    
-    Implementation uses double sum over intermediate states k, l:
-    ∑_k ∑_l ⟨n| D(β_C - β_A) |k⟩ ⟨k| G_{α,0} |l⟩ ⟨l| D(β_B - β_C) |m⟩
-    truncated to k, l < max(n, m) + cutoff.
+    This is a **validation backend** (approximate, not exact) that depends on
+    the `cutoff` parameter. The `cutoff` controls the truncation of intermediate
+    states: the intermediate index upper bound is max(n, m) + cutoff (inclusive).
+    Larger `cutoff` values should improve accuracy but increase computational cost.
+    This backend is intended for validation and exploration, not for final exact
+    assembly.
+
+    The expansion sums over intermediate oscillator states:
+        Σ_{k=0}^{K} Σ_{l=0}^{K}
+            ⟨n|D(β_left_op)|k⟩ ⟨k|G_{α,0}|l⟩ ⟨l|D(β_right_op)|m⟩
+    where K = max(n, m) + cutoff (inclusive), and the displacement parameters
+    are derived from the geometric factorization of the displaced Gaussian.
+
+    Note: If `cutoff` is None, a default of 20 is used.
     """
     import math
-    
+
     beta_left = math.sqrt(omega / 2.0) * center_left
     beta_right = math.sqrt(omega / 2.0) * center_right
     beta_gaussian = math.sqrt(omega / 2.0) * gaussian_center
-    
+
     beta_left_op = beta_gaussian - beta_left
     beta_right_op = beta_right - beta_gaussian
-    
+
     max_nm = max(n, m)
     if cutoff is None:
         cutoff = 20
     max_index = max_nm + cutoff
-    
+
     total = 0.0
-    for k in range(max_index):
+    for k in range(max_index + 1):
         left_factor = displacement_matrix_element(n, k, beta_left_op)
         if left_factor == 0.0:
             continue
-        for l in range(max_index):
+        for l in range(max_index + 1):
             center_factor = origin_gaussian_matrix_element(k, l, omega, alpha)
             if center_factor == 0.0:
                 continue
             right_factor = displacement_matrix_element(l, m, beta_right_op)
             total += left_factor * center_factor * right_factor
-    
+
     return total
+
+
+# Backward compatibility alias
+# WARNING: This alias currently points to the truncated validation backend.
+# It is not an exact displaced Gaussian implementation and may be replaced
+# by an exact implementation in the future.
+displaced_gaussian_matrix_element = displaced_gaussian_matrix_element_truncated
 
 
 def kinetic_matrix_element(
