@@ -218,7 +218,7 @@ def _evaluate_displacement_terms(
     return prefactor * total
 
 
-def displaced_gaussian_matrix_element_finite_sum(
+def displaced_gaussian_matrix_element_truncated_prolog(
     n: int,
     center_left: float,
     m: int,
@@ -228,28 +228,24 @@ def displaced_gaussian_matrix_element_finite_sum(
     gaussian_center: float,
     cutoff: int = 12,
 ) -> float:
-    """Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using explicit triple finite sum.
+    """
+    Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ via explicit triple sum over intermediate
+    oscillator states.  This is a **truncated** expansion; the result depends on
+    `cutoff` and is intended as a validation/exploratory backend, not an exact
+    closed-form evaluator.
 
     Decomposition:
         ⟨n,A|G_{α,C}|m,B⟩ = ⟨n| D(β_L) G_{α,0} D(β_R) |m⟩
-
     where β_L = √(ω/2) (C - A), β_R = √(ω/2) (B - C).
 
-    The matrix element is expanded as a triple sum over intermediate
-    indices i, j and the internal Gaussian index K:
-
-        Σ_i Σ_j Σ_K  ⟨n|D(β_L)|i⟩  ⟨i|G_{α,0}|j⟩  ⟨j|D(β_R)|m⟩
+    Expansion:
+        Σ_{i=0}^{M} Σ_{j=0}^{M} Σ_K
+            ⟨n|D(β_L)|i⟩ ⟨i|G_{α,0}|j⟩ ⟨j|D(β_R)|m⟩
+    with M = max(n, m) + cutoff (inclusive upper bound).
 
     Each factor is evaluated via Prolog-generated algebraic terms:
       - Displacement terms from query_displacement_terms
       - Gaussian terms from query_gaussian_terms
-
-    The sum over intermediate states i, j is truncated to
-    max_index = max(n, m) + cutoff.  The default cutoff=12 gives
-    ~1e-12 relative accuracy for n,m ≤ 6.
-
-    This is a correctness-first implementation: clarity over performance,
-    no analytic collapse.
     """
     from qmarg.prolog_bridge import (
         evaluate_gaussian_terms,
@@ -265,9 +261,9 @@ def displaced_gaussian_matrix_element_finite_sum(
 
     displacement_cache: dict[tuple[int, int], tuple] = {}
     gaussian_cache: dict[tuple[int, int], tuple] = {}
-    
+
     total = 0.0
-    for i in range(max_index):
+    for i in range(max_index + 1):
         key_left = (n, i)
         if key_left not in displacement_cache:
             displacement_cache[key_left] = query_displacement_terms(n, i)
@@ -275,7 +271,7 @@ def displaced_gaussian_matrix_element_finite_sum(
         left_val = _evaluate_displacement_terms(left_terms, beta_left)
         if left_val == 0.0:
             continue
-        for j in range(max_index):
+        for j in range(max_index + 1):
             key_gauss = (i, j)
             if key_gauss not in gaussian_cache:
                 gaussian_cache[key_gauss] = query_gaussian_terms(i, j)
@@ -310,32 +306,36 @@ def displaced_gaussian_matrix_element_truncated(
     `cutoff` parameter for truncation of intermediate states.
     """
     import math
-    
+
     beta_left = math.sqrt(omega / 2.0) * center_left
     beta_right = math.sqrt(omega / 2.0) * center_right
     beta_gaussian = math.sqrt(omega / 2.0) * gaussian_center
-    
+
     beta_left_op = beta_gaussian - beta_left
     beta_right_op = beta_right - beta_gaussian
-    
+
     max_nm = max(n, m)
     if cutoff is None:
         cutoff = 20
     max_index = max_nm + cutoff
-    
+
     total = 0.0
-    for k in range(max_index):
+    for k in range(max_index + 1):
         left_factor = displacement_matrix_element(n, k, beta_left_op)
         if left_factor == 0.0:
             continue
-        for l in range(max_index):
+        for l in range(max_index + 1):
             center_factor = origin_gaussian_matrix_element(k, l, omega, alpha)
             if center_factor == 0.0:
                 continue
             right_factor = displacement_matrix_element(l, m, beta_right_op)
             total += left_factor * center_factor * right_factor
-    
+
     return total
+
+
+# Backward compatibility alias
+displaced_gaussian_matrix_element = displaced_gaussian_matrix_element_truncated
 
 
 def kinetic_matrix_element(

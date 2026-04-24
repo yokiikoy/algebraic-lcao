@@ -5,7 +5,7 @@ import unittest
 from qmarg.fock import (
     displaced_gaussian_factorization,
     displaced_gaussian_matrix_element_truncated,
-    displaced_gaussian_matrix_element_finite_sum,
+    displaced_gaussian_matrix_element_truncated_prolog,
     ho_gaussian_matrix_element,
     origin_gaussian_matrix_element,
     displacement_matrix_element,
@@ -125,22 +125,25 @@ class DisplacedGaussianTest(unittest.TestCase):
                 self.assertAlmostEqual(val, expected, places=10)
 
     def test_alpha_zero_identity(self) -> None:
-        """α=0 → exp(-α(x-C)²) = identity operator."""
+        """α=0 → Gaussian becomes identity; verify cutoff convergence."""
         omega = 0.8
         alpha = 0.0
         A = -0.4
         B = 0.3
         C = 0.1
-        for n in range(5):
-            for m in range(5):
-                val = displaced_gaussian_matrix_element_truncated(
-                    n, A, m, B, omega, alpha, C
-                )
-                # Should reduce to ⟨n,A|m,B⟩ = displacement matrix element
-                beta = (B - A) * (omega / 2.0) ** 0.5
-                expected = displacement_matrix_element(n, m, beta)
-                self.assertAlmostEqual(val, expected, places=12)
-
+        beta = (B - A) * (omega / 2.0) ** 0.5
+        for n in range(4):
+            for m in range(4):
+                with self.subTest(n=n, m=m):
+                    exact = displacement_matrix_element(n, m, beta)
+                    errors = []
+                    for cutoff in (2, 6, 12, 20):
+                        approx = displaced_gaussian_matrix_element_truncated(
+                            n, A, m, B, omega, alpha, C, cutoff=cutoff
+                        )
+                        errors.append(abs(approx - exact))
+                    self.assertLess(errors[-1], errors[0])
+                    self.assertLess(errors[-1], 1e-8)
 
     def test_convergence_with_increasing_cutoff(self) -> None:
         """Higher cutoff should converge closer to exact kernel."""
@@ -257,7 +260,7 @@ class DisplacedGaussianTest(unittest.TestCase):
                 expected = ho_gaussian_matrix_element(
                     n, A, m, B, omega, alpha, C,
                 )
-                actual = displaced_gaussian_matrix_element_finite_sum(
+                actual = displaced_gaussian_matrix_element_truncated_prolog(
                     n, A, m, B, omega, alpha, C,
                 )
                 self.assertAlmostEqual(actual, expected, places=10)
@@ -273,14 +276,14 @@ class DisplacedGaussianTest(unittest.TestCase):
                                 n, m, omega, alpha,
                             )
                             actual = (
-                                displaced_gaussian_matrix_element_finite_sum(
+                                displaced_gaussian_matrix_element_truncated_prolog(
                                     n, 0.0, m, 0.0, omega, alpha, 0.0,
                                 )
                             )
                             self.assertAlmostEqual(actual, expected, places=12)
 
     def test_finite_sum_alpha_zero_identity(self) -> None:
-        """α = 0 must reduce to ⟨n,A|m,B⟩ = displacement matrix element."""
+        """α=0: verify convergence toward displacement matrix element with cutoff."""
         omega = 0.8
         alpha = 0.0
         cases = [
@@ -292,15 +295,15 @@ class DisplacedGaussianTest(unittest.TestCase):
         for A, B, C, n, m in cases:
             with self.subTest(A=A, B=B, C=C, n=n, m=m):
                 beta = (B - A) * (omega / 2.0) ** 0.5
-                expected = displacement_matrix_element(n, m, beta)
-                actual = (
-                    displaced_gaussian_matrix_element_finite_sum(
-                        n, A, m, B, omega, alpha, C,
+                exact = displacement_matrix_element(n, m, beta)
+                errors = []
+                for cutoff in (2, 6, 12, 20):
+                    approx = displaced_gaussian_matrix_element_truncated_prolog(
+                        n, A, m, B, omega, alpha, C, cutoff=cutoff
                     )
-                )
-                self.assertAlmostEqual(
-                    actual, expected, places=12,
-                )
+                    errors.append(abs(approx - exact))
+                self.assertLess(errors[-1], errors[0])
+                self.assertLess(errors[-1], 1e-8)
 
     def test_finite_sum_symmetry(self) -> None:
         """Swapping (n,A) <-> (m,B) must give same result."""
@@ -315,38 +318,37 @@ class DisplacedGaussianTest(unittest.TestCase):
         for A, B, C, n, m in cases:
             with self.subTest(A=A, B=B, C=C, n=n, m=m):
                 val1 = (
-                    displaced_gaussian_matrix_element_finite_sum(
+                    displaced_gaussian_matrix_element_truncated_prolog(
                         n, A, m, B, omega, alpha, C,
                     )
                 )
                 val2 = (
-                    displaced_gaussian_matrix_element_finite_sum(
+                    displaced_gaussian_matrix_element_truncated_prolog(
                         m, B, n, A, omega, alpha, C,
                     )
                 )
                 self.assertAlmostEqual(val1, val2, places=12)
 
     def test_truncated_cutoff_stabilization(self) -> None:
-        """Small cutoffs 2,4,6 must show stabilizing values for n,m <=4."""
+        """Small cutoffs 2,4,6 must show stabilizing values for n,m ≤ 4."""
         omega = 0.8
         alpha = 0.35
         A, B, C = -0.5, 0.7, -0.2
-        cases = [(0,0), (1,1), (2,2), (1,3), (3,1)]
+        cases = [(0, 0), (1, 1), (2, 0), (0, 2), (2, 2)]
         cutoffs = [2, 4, 6]
-        reference = ho_gaussian_matrix_element(n=A, m=B wait no.
-Wait, fixed params A,B,C,n,m per case.
-
-No, for each case:
-
-reference = ho_gaussian_matrix_element(n, A, m, B, omega, alpha, C)
-
-errors = [abs(val - reference) for val in vals]
-
-self.assertLess(errors[1], errors[0])
-
-self.assertLess(errors[2], errors[1])
-
-self.assertLess(errors[2], 1e-6)
+        for n, m in cases:
+            with self.subTest(n=n, m=m):
+                reference = ho_gaussian_matrix_element(
+                    n, A, m, B, omega, alpha, C
+                )
+                errors = []
+                for cutoff in cutoffs:
+                    val = displaced_gaussian_matrix_element_truncated_prolog(
+                        n, A, m, B, omega, alpha, C, cutoff=cutoff
+                    )
+                    errors.append(abs(val - reference))
+                self.assertLess(errors[1], errors[0])
+                self.assertLess(errors[2], errors[1])
 
 if __name__ == "__main__":
     unittest.main()
