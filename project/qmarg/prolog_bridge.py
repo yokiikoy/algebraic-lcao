@@ -301,3 +301,192 @@ def query_gaussian_term_structure(
             f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
         ) from exc
     return parse_gaussian_term_structure(completed.stdout)
+
+
+# ---------------------------------------------------------------------------
+# Gaussian operator term skeleton bridge
+# ---------------------------------------------------------------------------
+
+_GAUSSIAN_SKELETON_RE = re.compile(r"^gaussian_skeleton\(k\((\d+)\)\)$")
+
+
+def parse_gaussian_term_skeletons(text: str) -> tuple[int, ...]:
+    """Parse term-by-term skeleton output from emit_gaussian_term_skeletons/2."""
+    ks = []
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        match = _GAUSSIAN_SKELETON_RE.match(line)
+        if match is None:
+            raise ValueError(f"Unsupported Prolog Gaussian skeleton result: {line!r}")
+        ks.append(int(match.group(1)))
+    return tuple(ks)
+
+
+def query_gaussian_term_skeletons(
+    n: int,
+    m: int,
+    prolog_file: Path = DEFAULT_PROLOG_FILE,
+) -> tuple[int, ...]:
+    """Request all valid summation indices K for <n | G_alpha | m> from Prolog."""
+    goal = f"emit_gaussian_term_skeletons({n},{m}),halt."
+    try:
+        completed = subprocess.run(
+            [swipl_executable(), "-q", "-s", str(prolog_file), "-g", goal],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise PrologQueryError(
+            "SWI-Prolog query failed: "
+            f"goal={goal!r}, returncode={exc.returncode}, "
+            f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
+        ) from exc
+    return parse_gaussian_term_skeletons(completed.stdout)
+
+
+# ---------------------------------------------------------------------------
+# Gaussian operator term with coefficient skeleton bridge
+# ---------------------------------------------------------------------------
+
+_GAUSSIAN_TERM_RE = re.compile(
+    r"^gaussian_term\("
+    r"k\((\d+)\),"
+    r"i\((\d+)\),"
+    r"j\((\d+)\),"
+    r"factorial_skeleton\(num\(\[(.*?)\]\),den\(\[(.*?)\]\)\),"
+    r"power_of_two\((\d+)\)\)$"
+)
+
+
+@dataclass(frozen=True)
+class GaussianTerm:
+    k: int
+    i: int
+    j: int
+    num_indices: tuple[int, ...]
+    den_indices: tuple[int, ...]
+    power_of_two: int
+
+    def evaluate(self, omega: float, alpha: float) -> float:
+        """Evaluate this Gaussian term numerically for given omega and alpha."""
+        import math
+
+        g = alpha / omega
+        scale = 1.0 + g
+        a_coeff = -g / scale
+        b_coeff = 2.0 / scale
+
+        # Evaluate coefficient: a^i / i! * a^j / j! * b^k / k!
+        coeff = (
+            (a_coeff ** self.i / math.factorial(self.i))
+            * (a_coeff ** self.j / math.factorial(self.j))
+            * (b_coeff ** self.k / math.factorial(self.k))
+        )
+
+        # Normalization from the skeleton: sqrt(n! * m!) / sqrt(2^(n+m)) / sqrt(scale)
+        n, m = self.num_indices
+        normalization = (
+            math.sqrt(math.factorial(n) * math.factorial(m))
+            / math.sqrt(2.0 ** self.power_of_two)
+            / math.sqrt(scale)
+        )
+
+        return normalization * coeff
+
+
+def _parse_int_list(text: str) -> tuple[int, ...]:
+    return tuple(int(x.strip()) for x in text.split(",") if x.strip())
+
+
+def parse_gaussian_terms(text: str) -> tuple[GaussianTerm, ...]:
+    """Parse term-by-term Gaussian coefficient skeleton output."""
+    terms = []
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        match = _GAUSSIAN_TERM_RE.match(line)
+        if match is None:
+            raise ValueError(f"Unsupported Prolog Gaussian term result: {line!r}")
+        k, i, j, num_str, den_str, pow2 = match.groups()
+        k_val = int(k)
+        i_val = int(i)
+        j_val = int(j)
+        den_indices = _parse_int_list(den_str)
+        pow2_val = int(pow2)
+
+        # Hardening: validate structural consistency
+        expected_den = (i_val, j_val, k_val)
+        if den_indices != expected_den:
+            raise ValueError(
+                f"Malformed Prolog Gaussian term: den_indices {den_indices} "
+                f"!= expected {expected_den} in line: {line!r}"
+            )
+
+        num_indices = _parse_int_list(num_str)
+        n, m = num_indices
+        expected_pow2 = n + m
+        if pow2_val != expected_pow2:
+            raise ValueError(
+                f"Malformed Prolog Gaussian term: power_of_two {pow2_val} "
+                f"!= expected {expected_pow2} (n+m) in line: {line!r}"
+            )
+
+        # Additional structural checks for parity-derived relations
+        if n - k_val != 2 * i_val:
+            raise ValueError(
+                f"Malformed Prolog Gaussian term: n - k ({n - k_val}) "
+                f"!= 2*i ({2 * i_val}) in line: {line!r}"
+            )
+        if m - k_val != 2 * j_val:
+            raise ValueError(
+                f"Malformed Prolog Gaussian term: m - k ({m - k_val}) "
+                f"!= 2*j ({2 * j_val}) in line: {line!r}"
+            )
+
+        terms.append(
+            GaussianTerm(
+                k=k_val,
+                i=i_val,
+                j=j_val,
+                num_indices=num_indices,
+                den_indices=den_indices,
+                power_of_two=pow2_val,
+            )
+        )
+    return tuple(terms)
+
+
+def query_gaussian_terms(
+    n: int,
+    m: int,
+    prolog_file: Path = DEFAULT_PROLOG_FILE,
+) -> tuple[GaussianTerm, ...]:
+    """Request Gaussian term coefficient skeletons for <n | G_alpha | m>."""
+    goal = f"emit_gaussian_terms({n},{m}),halt."
+    try:
+        completed = subprocess.run(
+            [swipl_executable(), "-q", "-s", str(prolog_file), "-g", goal],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise PrologQueryError(
+            "SWI-Prolog query failed: "
+            f"goal={goal!r}, returncode={exc.returncode}, "
+            f"stdout={exc.stdout!r}, stderr={exc.stderr!r}"
+        ) from exc
+    return parse_gaussian_terms(completed.stdout)
+
+
+def evaluate_gaussian_terms(
+    terms: tuple[GaussianTerm, ...],
+    omega: float,
+    alpha: float,
+) -> float:
+    """Evaluate the finite sum of Gaussian terms."""
+    return sum(term.evaluate(omega, alpha) for term in terms)

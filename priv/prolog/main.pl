@@ -156,3 +156,88 @@ emit_gaussian_term_structure(N, M) :-
     Result = gaussian_struct(parity(Parity), allowed(Allowed)),
     write_canonical(Result),
     nl.
+
+% ---------------------------------------------------------------------------
+% Gaussian operator term skeleton (index structure only)
+% ---------------------------------------------------------------------------
+%
+% The centered Gaussian operator G_alpha = exp(-alpha x^2) connects
+% oscillator states via even-parity transitions only.  Its matrix element
+% <n | G_alpha | m> can be written as a finite sum over an internal index K.
+%
+% Structural constraints on K (index-skeleton level, no coefficients):
+%   * parity:  n + m must be even
+%   * K ranges over values where both (n - K) and (m - K) are even
+%   * K <= min(n, m)
+%   * K >= 0
+%
+% Each valid K corresponds to one term in the finite-sum decomposition.
+% The actual coefficient for each K is computed in Python, not here.
+
+% gaussian_term_skeleton(+N, +M, -K)
+%
+% On backtracking, enumerates all valid summation indices K for the
+% matrix element <n | G_alpha | m>.  K is an integer satisfying:
+%   0 <= K <= min(N, M)
+%   (N - K) mod 2 = 0
+%   (M - K) mod 2 = 0
+%
+% These constraints come from the even-ladder structure of the Gaussian
+% operator when expanded in the oscillator basis.
+gaussian_term_skeleton(N, M, K) :-
+    nonnegative_integer(N),
+    nonnegative_integer(M),
+    0 is (N + M) mod 2,
+    K_min is 0,
+    K_max is min(N, M),
+    between(K_min, K_max, K),
+    0 is (N - K) mod 2,
+    0 is (M - K) mod 2.
+
+emit_gaussian_term_skeletons(N, M) :-
+    gaussian_term_skeleton(N, M, K),
+    Term = gaussian_skeleton(k(K)),
+    write_canonical(Term),
+    nl,
+    fail.
+emit_gaussian_term_skeletons(_, _).
+
+% ---------------------------------------------------------------------------
+% Gaussian operator term with coefficient skeleton
+% ---------------------------------------------------------------------------
+%
+% For each valid K, the centered Gaussian matrix element <n | G_alpha | m>
+% contributes one term with the following structural coefficient skeleton:
+%
+%   i = (n - k) / 2
+%   j = (m - k) / 2
+%
+%   normalization: sqrt(n! * m!) / sqrt(2^(n+m)) / sqrt(1 + g)
+%   term factor:   (a^i / i!) * (a^j / j!) * (b^k / k!)
+%
+% where a = -g/(1+g), b = 2/(1+g), g = alpha/omega.
+%
+% Prolog generates only the index skeleton and factorial structure.
+% Python evaluates the numeric coefficients using alpha and omega.
+
+% gaussian_term(+N, +M, -K, -TermStruct)
+%
+% TermStruct = gaussian_term(
+%   k(K),
+%   i(I),
+%   j(J),
+%   factorial_skeleton(num([N, M]), den([I, J, K])),
+%   power_of_two(N_plus_M)
+% )
+gaussian_term(N, M, K, gaussian_term(k(K), i(I), j(J), factorial_skeleton(num([N, M]), den([I, J, K])), power_of_two(N_plus_M))) :-
+    gaussian_term_skeleton(N, M, K),
+    I is (N - K) // 2,
+    J is (M - K) // 2,
+    N_plus_M is N + M.
+
+emit_gaussian_terms(N, M) :-
+    gaussian_term(N, M, _, Term),
+    write_canonical(Term),
+    nl,
+    fail.
+emit_gaussian_terms(_, _).
