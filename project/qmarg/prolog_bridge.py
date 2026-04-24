@@ -435,6 +435,18 @@ def parse_gaussian_terms(text: str) -> tuple[GaussianTerm, ...]:
                 f"!= expected {expected_pow2} (n+m) in line: {line!r}"
             )
 
+        # Additional structural checks for parity-derived relations
+        if n - k_val != 2 * i_val:
+            raise ValueError(
+                f"Malformed Prolog Gaussian term: n - k ({n - k_val}) "
+                f"!= 2*i ({2 * i_val}) in line: {line!r}"
+            )
+        if m - k_val != 2 * j_val:
+            raise ValueError(
+                f"Malformed Prolog Gaussian term: m - k ({m - k_val}) "
+                f"!= 2*j ({2 * j_val}) in line: {line!r}"
+            )
+
         terms.append(
             GaussianTerm(
                 k=k_val,
