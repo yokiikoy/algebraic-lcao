@@ -5,6 +5,7 @@ import unittest
 from qmarg.fock import (
     displaced_gaussian_factorization,
     displaced_gaussian_matrix_element,
+    displaced_gaussian_matrix_element_finite_sum,
     ho_gaussian_matrix_element,
     origin_gaussian_matrix_element,
     displacement_matrix_element,
@@ -237,6 +238,93 @@ class DisplacedGaussianTest(unittest.TestCase):
                         self.assertIsInstance(left, float)
                         self.assertIsInstance(center, float)
                         self.assertIsInstance(right, float)
+
+    # -------------------------------------------------------------------
+    # Finite-sum (Prolog-based) displaced Gaussian tests
+    # -------------------------------------------------------------------
+
+    def test_finite_sum_matches_ho_gaussian_matrix_element(self) -> None:
+        """Prolog finite-sum must match exact Hermite-moment reference."""
+        cases = [
+            (0.8, 0.15, -0.5, -0.3, -0.2, 0, 0),
+            (0.8, 0.15, -0.5, -0.3, -0.2, 1, 0),
+            (0.8, 0.15, 0.5, 0.7, 0.4, 2, 1),
+            (0.8, 0.35, -0.5, 0.7, -0.2, 0, 2),
+            (0.8, 0.35, 0.5, -0.3, 0.4, 3, 2),
+        ]
+        for omega, alpha, A, B, C, n, m in cases:
+            with self.subTest(omega=omega, alpha=alpha, A=A, B=B, C=C, n=n, m=m):
+                expected = ho_gaussian_matrix_element(
+                    n, A, m, B, omega, alpha, C,
+                )
+                actual = displaced_gaussian_matrix_element_finite_sum(
+                    n, A, m, B, omega, alpha, C,
+                )
+                self.assertAlmostEqual(actual, expected, places=10)
+
+    def test_finite_sum_centered_limit(self) -> None:
+        """A = B = C = 0 must reduce to origin_gaussian_matrix_element."""
+        for omega in (0.8,):
+            for alpha in (0.15, 0.35):
+                for n in range(3):
+                    for m in range(3):
+                        with self.subTest(omega=omega, alpha=alpha, n=n, m=m):
+                            expected = origin_gaussian_matrix_element(
+                                n, m, omega, alpha,
+                            )
+                            actual = (
+                                displaced_gaussian_matrix_element_finite_sum(
+                                    n, 0.0, m, 0.0, omega, alpha, 0.0,
+                                )
+                            )
+                            self.assertAlmostEqual(actual, expected, places=12)
+
+    def test_finite_sum_alpha_zero_identity(self) -> None:
+        """α = 0 must reduce to ⟨n,A|m,B⟩ = displacement matrix element."""
+        omega = 0.8
+        alpha = 0.0
+        cases = [
+            (-0.4, -0.3, -0.2, 0, 0),
+            (-0.4, 0.7, -0.2, 1, 2),
+            (0.5, -0.3, 0.4, 2, 0),
+            (0.5, 0.7, 0.4, 3, 1),
+        ]
+        for A, B, C, n, m in cases:
+            with self.subTest(A=A, B=B, C=C, n=n, m=m):
+                beta = (B - A) * (omega / 2.0) ** 0.5
+                expected = displacement_matrix_element(n, m, beta)
+                actual = (
+                    displaced_gaussian_matrix_element_finite_sum(
+                        n, A, m, B, omega, alpha, C,
+                    )
+                )
+                self.assertAlmostEqual(
+                    actual, expected, places=12,
+                )
+
+    def test_finite_sum_symmetry(self) -> None:
+        """Swapping (n,A) <-> (m,B) must give same result."""
+        omega = 0.8
+        alpha = 0.35
+        cases = [
+            (-0.5, -0.3, -0.2, 0, 0),
+            (-0.5, 0.7, 0.0, 1, 2),
+            (0.5, -0.3, 0.4, 2, 0),
+            (0.0, 0.0, 0.0, 3, 3),
+        ]
+        for A, B, C, n, m in cases:
+            with self.subTest(A=A, B=B, C=C, n=n, m=m):
+                val1 = (
+                    displaced_gaussian_matrix_element_finite_sum(
+                        n, A, m, B, omega, alpha, C,
+                    )
+                )
+                val2 = (
+                    displaced_gaussian_matrix_element_finite_sum(
+                        m, B, n, A, omega, alpha, C,
+                    )
+                )
+                self.assertAlmostEqual(val1, val2, places=12)
 
 
 if __name__ == "__main__":

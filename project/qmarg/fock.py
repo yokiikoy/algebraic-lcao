@@ -201,6 +201,86 @@ def displaced_gaussian_factorization(
     return beta_left, beta_right
 
 
+def _evaluate_displacement_terms(
+    terms: tuple, beta: float
+) -> float:
+    """Evaluate displacement finite sum from Prolog terms:
+    exp(-beta^2/2) * Σ_term beta^p/p! * (-beta)^q/q! * sqrt(source! * target!) / den!.
+    """
+    import math
+
+    prefactor = math.exp(-0.5 * beta ** 2)
+    total = 0.0
+    for term in terms:
+        total += (
+            term.evaluate_beta_factor(beta) * term.ladder_coefficient.evaluate()
+        )
+    return prefactor * total
+
+
+def displaced_gaussian_matrix_element_finite_sum(
+    n: int,
+    center_left: float,
+    m: int,
+    center_right: float,
+    omega: float,
+    alpha: float,
+    gaussian_center: float,
+    cutoff: int = 12,
+) -> float:
+    """Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using explicit triple finite sum.
+
+    Decomposition:
+        ⟨n,A|G_{α,C}|m,B⟩ = ⟨n| D(β_L) G_{α,0} D(β_R) |m⟩
+
+    where β_L = √(ω/2) (C - A), β_R = √(ω/2) (B - C).
+
+    The matrix element is expanded as a triple sum over intermediate
+    indices i, j and the internal Gaussian index K:
+
+        Σ_i Σ_j Σ_K  ⟨n|D(β_L)|i⟩  ⟨i|G_{α,0}|j⟩  ⟨j|D(β_R)|m⟩
+
+    Each factor is evaluated via Prolog-generated algebraic terms:
+      - Displacement terms from query_displacement_terms
+      - Gaussian terms from query_gaussian_terms
+
+    The sum over intermediate states i, j is truncated to
+    max_index = max(n, m) + cutoff.  The default cutoff=12 gives
+    ~1e-12 relative accuracy for n,m ≤ 6.
+
+    This is a correctness-first implementation: clarity over performance,
+    no analytic collapse.
+    """
+    from qmarg.prolog_bridge import (
+        evaluate_gaussian_terms,
+        query_displacement_terms,
+        query_gaussian_terms,
+    )
+
+    beta_left, beta_right = displaced_gaussian_factorization(
+        center_left, center_right, gaussian_center, omega
+    )
+
+    max_index = max(n, m) + cutoff
+
+    total = 0.0
+    for i in range(max_index):
+        left_terms = query_displacement_terms(n, i)
+        left_val = _evaluate_displacement_terms(left_terms, beta_left)
+        if left_val == 0.0:
+            continue
+        for j in range(max_index):
+            gauss_terms = query_gaussian_terms(i, j)
+            gauss_val = evaluate_gaussian_terms(gauss_terms, omega, alpha)
+            if gauss_val == 0.0:
+                continue
+            right_terms = query_displacement_terms(j, m)
+            right_val = _evaluate_displacement_terms(right_terms, beta_right)
+            total += left_val * gauss_val * right_val
+
+    return total
+
+
 def displaced_gaussian_matrix_element(
     n: int,
     center_left: float,
