@@ -4,7 +4,7 @@ import unittest
 
 from qmarg.fock import (
     displaced_gaussian_factorization,
-    displaced_gaussian_matrix_element,
+    displaced_gaussian_matrix_element_truncated,
     displaced_gaussian_matrix_element_finite_sum,
     ho_gaussian_matrix_element,
     origin_gaussian_matrix_element,
@@ -44,7 +44,7 @@ class DisplacedGaussianTest(unittest.TestCase):
                     alpha,
                     gaussian_center,
                 )
-                actual = displaced_gaussian_matrix_element(
+                actual = displaced_gaussian_matrix_element_truncated(
                     n,
                     center_left,
                     m,
@@ -67,7 +67,7 @@ class DisplacedGaussianTest(unittest.TestCase):
                             expected = origin_gaussian_matrix_element(
                                 n, m, omega, alpha
                             )
-                            actual = displaced_gaussian_matrix_element(
+                            actual = displaced_gaussian_matrix_element_truncated(
                                 n, 0.0, m, 0.0, omega, alpha, 0.0
                             )
                             self.assertAlmostEqual(actual, expected, places=12)
@@ -81,10 +81,10 @@ class DisplacedGaussianTest(unittest.TestCase):
         C = 0.1
         for n in range(5):
             for m in range(5):
-                val1 = displaced_gaussian_matrix_element(
+                val1 = displaced_gaussian_matrix_element_truncated(
                     n, A, m, B, omega, alpha, C
                 )
-                val2 = displaced_gaussian_matrix_element(
+                val2 = displaced_gaussian_matrix_element_truncated(
                     m, B, n, A, omega, alpha, C
                 )
                 self.assertAlmostEqual(val1, val2, places=12)
@@ -97,7 +97,7 @@ class DisplacedGaussianTest(unittest.TestCase):
         gaussian_center = 0.7
         for n in range(5):
             for m in range(5):
-                val = displaced_gaussian_matrix_element(
+                val = displaced_gaussian_matrix_element_truncated(
                     n, center, m, center, omega, alpha, gaussian_center
                 )
                 # Can compare with ho_gaussian_matrix_element
@@ -115,7 +115,7 @@ class DisplacedGaussianTest(unittest.TestCase):
         C = (A + B) / 2.0
         for n in range(5):
             for m in range(5):
-                val = displaced_gaussian_matrix_element(
+                val = displaced_gaussian_matrix_element_truncated(
                     n, A, m, B, omega, alpha, C
                 )
                 # Compare with ho_gaussian_matrix_element
@@ -133,7 +133,7 @@ class DisplacedGaussianTest(unittest.TestCase):
         C = 0.1
         for n in range(5):
             for m in range(5):
-                val = displaced_gaussian_matrix_element(
+                val = displaced_gaussian_matrix_element_truncated(
                     n, A, m, B, omega, alpha, C
                 )
                 # Should reduce to ⟨n,A|m,B⟩ = displacement matrix element
@@ -157,7 +157,7 @@ class DisplacedGaussianTest(unittest.TestCase):
 
         errors = []
         for cutoff in (5, 10, 20, 40):
-            approx = displaced_gaussian_matrix_element(
+            approx = displaced_gaussian_matrix_element_truncated(
                 n, A, m, B, omega, alpha, C, cutoff=cutoff
             )
             err = abs(approx - reference)
@@ -326,6 +326,27 @@ class DisplacedGaussianTest(unittest.TestCase):
                 )
                 self.assertAlmostEqual(val1, val2, places=12)
 
+    def test_truncated_cutoff_stabilization(self) -> None:
+        """Small cutoffs 2,4,6 must show stabilizing values for n,m <=4."""
+        omega = 0.8
+        alpha = 0.35
+        A, B, C = -0.5, 0.7, -0.2
+        cases = [(0,0), (1,1), (2,2), (1,3), (3,1)]
+        cutoffs = [2, 4, 6]
+        reference = ho_gaussian_matrix_element(n=A, m=B wait no.
+Wait, fixed params A,B,C,n,m per case.
+
+No, for each case:
+
+reference = ho_gaussian_matrix_element(n, A, m, B, omega, alpha, C)
+
+errors = [abs(val - reference) for val in vals]
+
+self.assertLess(errors[1], errors[0])
+
+self.assertLess(errors[2], errors[1])
+
+self.assertLess(errors[2], 1e-6)
 
 if __name__ == "__main__":
     unittest.main()

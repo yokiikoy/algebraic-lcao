@@ -263,25 +263,37 @@ def displaced_gaussian_matrix_element_finite_sum(
 
     max_index = max(n, m) + cutoff
 
+    displacement_cache: dict[tuple[int, int], tuple] = {}
+    gaussian_cache: dict[tuple[int, int], tuple] = {}
+    
     total = 0.0
     for i in range(max_index):
-        left_terms = query_displacement_terms(n, i)
+        key_left = (n, i)
+        if key_left not in displacement_cache:
+            displacement_cache[key_left] = query_displacement_terms(n, i)
+        left_terms = displacement_cache[key_left]
         left_val = _evaluate_displacement_terms(left_terms, beta_left)
         if left_val == 0.0:
             continue
         for j in range(max_index):
-            gauss_terms = query_gaussian_terms(i, j)
+            key_gauss = (i, j)
+            if key_gauss not in gaussian_cache:
+                gaussian_cache[key_gauss] = query_gaussian_terms(i, j)
+            gauss_terms = gaussian_cache[key_gauss]
             gauss_val = evaluate_gaussian_terms(gauss_terms, omega, alpha)
             if gauss_val == 0.0:
                 continue
-            right_terms = query_displacement_terms(j, m)
+            key_right = (j, m)
+            if key_right not in displacement_cache:
+                displacement_cache[key_right] = query_displacement_terms(j, m)
+            right_terms = displacement_cache[key_right]
             right_val = _evaluate_displacement_terms(right_terms, beta_right)
             total += left_val * gauss_val * right_val
 
     return total
 
 
-def displaced_gaussian_matrix_element(
+def displaced_gaussian_matrix_element_truncated(
     n: int,
     center_left: float,
     m: int,
@@ -291,20 +303,11 @@ def displaced_gaussian_matrix_element(
     gaussian_center: float,
     cutoff: int | None = None,
 ) -> float:
-    """Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using decomposition formula.
-    
-    Decomposition formula from docs/su11_gaussian_operator.md:
-    ⟨n,A|G_{α,C}|m,B⟩ = ⟨n| D(β_C - β_A) G_{α,0} D(β_B - β_C) |m⟩
-    where β_X = sqrt(ω/2) * X and G_{α,0} = exp(-α x²).
-    
-    Important: This is a *truncated* double-sum realization of the decomposition.
-    It is **not** an exact closed-form displaced backend. The intermediate states
-    are summed only up to a finite cutoff, so the result is approximate and
-    intended mainly for validation and exploratory use.
-    
-    Implementation uses double sum over intermediate states k, l:
-    ∑_k ∑_l ⟨n| D(β_C - β_A) |k⟩ ⟨k| G_{α,0} |l⟩ ⟨l| D(β_B - β_C) |m⟩
-    truncated to k, l < max(n, m) + cutoff.
+    """
+    Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using truncated intermediate-state expansion.
+
+    This is a validation backend (approximate, not exact) that depends on the
+    `cutoff` parameter for truncation of intermediate states.
     """
     import math
     
