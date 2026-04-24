@@ -230,16 +230,21 @@ def displaced_gaussian_matrix_element_truncated_prolog(
 ) -> float:
     """
     Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ via explicit triple sum over intermediate
-    oscillator states.  This is a **truncated** expansion; the result depends on
-    `cutoff` and is intended as a validation/exploratory backend, not an exact
-    closed-form evaluator.
+    oscillator states.
+
+    This is a **truncated** expansion intended as a validation/exploratory
+    backend, not an exact closed-form evaluator. The `cutoff` parameter controls
+    the truncation of intermediate states: the upper bound for the intermediate
+    indices i and j is M = max(n, m) + cutoff (inclusive). Larger `cutoff` values
+    should improve accuracy at increased computational cost. This backend is
+    designed for validation and exploration, not for final exact assembly.
 
     Decomposition:
         ⟨n,A|G_{α,C}|m,B⟩ = ⟨n| D(β_L) G_{α,0} D(β_R) |m⟩
     where β_L = √(ω/2) (C - A), β_R = √(ω/2) (B - C).
 
     Expansion:
-        Σ_{i=0}^{M} Σ_{j=0}^{M} Σ_K
+        Σ_{i=0}^{M} Σ_{j=0}^{M}
             ⟨n|D(β_L)|i⟩ ⟨i|G_{α,0}|j⟩ ⟨j|D(β_R)|m⟩
     with M = max(n, m) + cutoff (inclusive upper bound).
 
@@ -300,10 +305,22 @@ def displaced_gaussian_matrix_element_truncated(
     cutoff: int | None = None,
 ) -> float:
     """
-    Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using truncated intermediate-state expansion.
+    Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using a truncated intermediate-state expansion.
+    
+    This is a **validation backend** (approximate, not exact) that depends on
+    the `cutoff` parameter. The `cutoff` controls the truncation of intermediate
+    states: the intermediate index upper bound is max(n, m) + cutoff (inclusive).
+    Larger `cutoff` values should improve accuracy but increase computational cost.
+    This backend is intended for validation and exploration, not for final exact
+    assembly.
 
-    This is a validation backend (approximate, not exact) that depends on the
-    `cutoff` parameter for truncation of intermediate states.
+    The expansion sums over intermediate oscillator states:
+        Σ_{k=0}^{K} Σ_{l=0}^{K}
+            ⟨n|D(β_left_op)|k⟩ ⟨k|G_{α,0}|l⟩ ⟨l|D(β_right_op)|m⟩
+    where K = max(n, m) + cutoff (inclusive), and the displacement parameters
+    are derived from the geometric factorization of the displaced Gaussian.
+
+    Note: If `cutoff` is None, a default of 20 is used.
     """
     import math
 
@@ -335,6 +352,9 @@ def displaced_gaussian_matrix_element_truncated(
 
 
 # Backward compatibility alias
+# WARNING: This alias currently points to the truncated validation backend.
+# It is not an exact displaced Gaussian implementation and may be replaced
+# by an exact implementation in the future.
 displaced_gaussian_matrix_element = displaced_gaussian_matrix_element_truncated
 
 
