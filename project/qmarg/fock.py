@@ -306,7 +306,7 @@ def displaced_gaussian_matrix_element_truncated(
 ) -> float:
     """
     Return ⟨n,A|exp(-α (x-C)²)|m,B⟩ using a truncated intermediate-state expansion.
-    
+
     This is a **validation backend** (approximate, not exact) that depends on
     the `cutoff` parameter. The `cutoff` controls the truncation of intermediate
     states: the intermediate index upper bound is max(n, m) + cutoff (inclusive).

@@ -47,10 +47,15 @@ class RealSpaceMatrixAssembler:
         problem: HamiltonianProblem,
         basis: BasisFunctionSet,
     ) -> tuple[np.ndarray, np.ndarray]:
+        if self.backend == "real_space":
+            return self._assemble_real_space(problem, basis)
         if self.backend == "algebraic_truncated":
             return self._assemble_algebraic_truncated(problem, basis)
 
-        return self._assemble_real_space(problem, basis)
+        raise ValueError(
+            f"Unknown backend '{self.backend}'. "
+            f"Supported backends: 'real_space', 'algebraic_truncated'."
+        )
 
     def _assemble_real_space(
         self,
